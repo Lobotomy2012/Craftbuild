@@ -172,6 +172,8 @@ namespace Craftbuild {
         std::mutex mesh_mutex;
         std::atomic<bool> mesh_ready = false;
         std::atomic<bool> generating_mesh = false;
+        std::vector<Vertex> pending_vertices;
+        std::vector<uint32_t> pending_indices;
 
         void init_window() {
             glfwInit();
@@ -376,10 +378,39 @@ namespace Craftbuild {
             for (unsigned int t = 0; t < thread_count; ++t) threads.emplace_back(worker);
             for (auto& t : threads) t.join();
 
-            all_vertices_size = vertices_sum.load();
-            all_indices_size = indices_sum.load();
             size_t total_generated = generated_count.load();
 
+            std::vector<Vertex> combined_vertices;
+            std::vector<uint32_t> combined_indices;
+            combined_vertices.reserve(vertices_sum.load());
+            combined_indices.reserve(indices_sum.load());
+
+            uint32_t vertex_offset = 0;
+            std::vector<Chunk*> chunks;
+            chunks.reserve(chunk_map.size());
+            for (auto& [k, c] : chunk_map) chunks.push_back(&c);
+            std::sort(chunks.begin(), chunks.end(), [&](Chunk* a, Chunk* b) {
+                int ax = a->x, az = a->z;
+                int bx = b->x, bz = b->z;
+                int px = static_cast<int>(camera_pos.x) / 16;
+                int pz = static_cast<int>(camera_pos.z) / 16;
+                return (std::abs(ax - px) + std::abs(az - pz)) < (std::abs(bx - px) + std::abs(bz - pz));
+            });
+
+            for (const auto* chunk_ptr : chunks) {
+                const Chunk& chunk = *chunk_ptr;
+                combined_vertices.insert(combined_vertices.end(), chunk.vertices.begin(), chunk.vertices.end());
+                for (uint32_t idx : chunk.indices) {
+                    combined_indices.push_back(idx + vertex_offset);
+                }
+                vertex_offset += static_cast<uint32_t>(chunk.vertices.size());
+            }
+
+            all_vertices_size = combined_vertices.size();
+            all_indices_size = combined_indices.size();
+
+            pending_vertices = std::move(combined_vertices);
+            pending_indices = std::move(combined_indices);
             mesh_ready.store(true);
 
             if (enable_validation_layers) {
@@ -590,9 +621,7 @@ namespace Craftbuild {
                 glfwPollEvents();
 
                 if (mesh_ready.load()) {
-                    std::lock_guard<std::mutex> lock(mesh_mutex);
                     update_buffers();
-                    mesh_ready.store(false);
                 }
 
                 draw_frame();
@@ -1807,7 +1836,19 @@ namespace Craftbuild {
         }
 
         void update_buffers() {
-            if (all_vertices_size == 0 or all_indices_size == 0) {
+            std::vector<Vertex> all_vertices;
+            std::vector<uint32_t> all_indices;
+            {
+                std::lock_guard<std::mutex> lock(mesh_mutex);
+                if (!mesh_ready.load()) return;
+                all_vertices.swap(pending_vertices);
+                all_indices.swap(pending_indices);
+                mesh_ready.store(false);
+            }
+
+            if (all_vertices.empty() or all_indices.empty()) {
+                all_vertices_size = 0;
+                all_indices_size = 0;
                 if (enable_validation_layers) {
                     std::cerr << "\033[93m[Warning]\033[33m No vertices or indices to render, skipping buffer update.\n";
                 }
@@ -1820,33 +1861,6 @@ namespace Craftbuild {
             vkFreeMemory(device, vertex_buffer_memory, nullptr);
             vkDestroyBuffer(device, index_buffer, nullptr);
             vkFreeMemory(device, index_buffer_memory, nullptr);
-
-            std::vector<Vertex> all_vertices;
-            std::vector<uint32_t> all_indices;
-
-            all_vertices.reserve(all_vertices_size);
-            all_indices.reserve(all_indices_size);
-
-            uint32_t vertex_offset = 0;
-            std::vector<Chunk*> chunks;
-            chunks.reserve(chunk_map.size());
-            for (auto& [k, c] : chunk_map) chunks.push_back(&c);
-            std::sort(chunks.begin(), chunks.end(), [&](Chunk* a, Chunk* b) {
-                int ax = a->x, az = a->z;
-                int bx = b->x, bz = b->z;
-                int px = static_cast<int>(camera_pos.x) / 16;
-                int pz = static_cast<int>(camera_pos.z) / 16;
-                return (std::abs(ax - px) + std::abs(az - pz)) < (std::abs(bx - px) + std::abs(bz - pz));
-            });
-
-            for (const auto* chunk_ptr : chunks) {
-                const Chunk& chunk = *chunk_ptr;
-                all_vertices.insert(all_vertices.end(), chunk.vertices.begin(), chunk.vertices.end());
-                for (uint32_t idx : chunk.indices) {
-                    all_indices.push_back(idx + vertex_offset);
-                }
-                vertex_offset += static_cast<uint32_t>(chunk.vertices.size());
-            }
 
             all_vertices_size = all_vertices.size();
             all_indices_size = all_indices.size();
