@@ -1839,22 +1839,14 @@ namespace Craftbuild {
                 return (std::abs(ax - px) + std::abs(az - pz)) < (std::abs(bx - px) + std::abs(bz - pz));
             });
 
-            std::thread vertex_thread([&]() {
-                for (const auto* chunk_ptr : chunks) {
-                    const Chunk& chunk = *chunk_ptr;
-                    all_vertices.insert(all_vertices.end(), chunk.vertices.begin(), chunk.vertices.end());
-                }
-            });
-
             for (const auto* chunk_ptr : chunks) {
                 const Chunk& chunk = *chunk_ptr;
+                all_vertices.insert(all_vertices.end(), chunk.vertices.begin(), chunk.vertices.end());
                 for (uint32_t idx : chunk.indices) {
                     all_indices.push_back(idx + vertex_offset);
                 }
                 vertex_offset += static_cast<uint32_t>(chunk.vertices.size());
             }
-
-			if (vertex_thread.joinable()) vertex_thread.join();
 
             all_vertices_size = all_vertices.size();
             all_indices_size = all_indices.size();
