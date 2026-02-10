@@ -9,7 +9,7 @@
 namespace Craftbuild {
     class CraftbuildGraphics {
     public:
-        CraftbuildGraphics() : vertex_buffer(nullptr), index_buffer(nullptr) {
+        CraftbuildGraphics() {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<> dist(1, 1'000'000'000);
@@ -126,8 +126,6 @@ namespace Craftbuild {
         VkDeviceMemory vertex_buffer_memory;
         VkBuffer index_buffer;
         VkDeviceMemory index_buffer_memory;
-        VkDeviceSize current_index_buffer_size = 0;
-        VkDeviceSize current_vertex_buffer_size = 0;
         size_t all_vertices_size = 0;
         size_t all_indices_size = 0;
 
@@ -178,7 +176,7 @@ namespace Craftbuild {
         std::vector<Vertex> pending_vertices;
         std::vector<uint32_t> pending_indices;
 
-        void init_window() {
+        inline void init_window() {
             glfwInit();
             glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
             window = glfwCreateWindow(WIDTH, HEIGHT, "Craftbuild indev 1.0", nullptr, nullptr);
@@ -186,7 +184,7 @@ namespace Craftbuild {
             glfwSetFramebufferSizeCallback(window, framebuffer_resize_callback);
         }
 
-        static void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
+        static inline void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
             auto app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
             app->framebuffer_resized = true;
         }
@@ -210,17 +208,16 @@ namespace Craftbuild {
             create_texture_sampler();
             create_uniform_buffers();
             create_descriptor_pool();
-            create_descriptor_sets();
         }
 
-        void init_input() {
+        inline void init_input() {
             glfwSetKeyCallback(window, key_callback);
             glfwSetCursorPosCallback(window, mouse_callback);
             glfwSetScrollCallback(window, scroll_callback);
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
 
-        static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+        static inline void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
             CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
             if (action == GLFW_PRESS) {
                 app->keys[key] = true;
@@ -264,7 +261,7 @@ namespace Craftbuild {
             app->camera_front = glm::normalize(front);
         }
 
-        static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+        static inline void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
             CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
             app->camera_speed += yoffset * 2.0f;
             if (app->camera_speed < 1.0f) app->camera_speed = 1.0f;
@@ -455,7 +452,7 @@ namespace Craftbuild {
             }
         }
 
-        uint32_t get_vertex_index(Chunk& chunk, const Vertex& vertex, std::unordered_map<Vertex, uint32_t>& vert_map) {
+        inline uint32_t get_vertex_index(Chunk& chunk, const Vertex& vertex, std::unordered_map<Vertex, uint32_t>& vert_map) {
             auto it = vert_map.find(vertex);
             if (it == vert_map.end()) {
                 uint32_t index = static_cast<uint32_t>(chunk.vertices.size());
@@ -605,24 +602,20 @@ namespace Craftbuild {
             }
         }
 
-        void reprocess_input() {
-            while (!glfwWindowShouldClose(window)) {
-                // delta time
-                float current_frame = glfwGetTime();
-                delta_time = current_frame - last_frame;
-                last_frame = current_frame;
-                process_input();
-            }
-        }
-
         void main_loop() {
             std::thread mesh_thread(&CraftbuildGraphics::regenerate_world, this);
-            std::thread input_thread(&CraftbuildGraphics::reprocess_input, this);
 
             create_buffers();
 
             while (!glfwWindowShouldClose(window)) {
                 glfwPollEvents();
+
+                // delta time
+                float current_frame = glfwGetTime();
+                delta_time = current_frame - last_frame;
+                last_frame = current_frame;
+
+                process_input();
 
                 if (mesh_ready.load()) {
                     recreate_buffers();
@@ -630,8 +623,8 @@ namespace Craftbuild {
 
                 draw_frame();
             }
+
             if (mesh_thread.joinable()) mesh_thread.join();
-            if (input_thread.joinable()) input_thread.join();
         }
 
         void cleanup_swap_chain() {
@@ -711,7 +704,7 @@ namespace Craftbuild {
             }
         }
 
-        void populate_debug_messenger_create_info(VkDebugUtilsMessengerCreateInfoEXT& create_info) {
+        inline void populate_debug_messenger_create_info(VkDebugUtilsMessengerCreateInfoEXT& create_info) {
             create_info = {};
             create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
             create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
@@ -720,7 +713,7 @@ namespace Craftbuild {
             create_info.pUserData = this;
         }
 
-        void setup_debug_messenger() {
+        inline void setup_debug_messenger() {
             if (!enable_validation_layers) return;
 
             VkDebugUtilsMessengerCreateInfoEXT create_info;
@@ -731,7 +724,7 @@ namespace Craftbuild {
             }
         }
 
-        void create_surface() {
+        inline void create_surface() {
             if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to create window surface!");
             }
@@ -761,7 +754,7 @@ namespace Craftbuild {
             }
         }
 
-        VkSampleCountFlagBits get_max_usable_sample_count() {
+        inline VkSampleCountFlagBits get_max_usable_sample_count() const {
             VkPhysicalDeviceProperties physical_device_properties;
             vkGetPhysicalDeviceProperties(physical_device, &physical_device_properties);
 
@@ -875,7 +868,7 @@ namespace Craftbuild {
             swap_chain_extent = extent;
         }
 
-        void create_image_views() {
+        inline void create_image_views() {
             swap_chain_image_views.resize(swap_chain_images.size());
 
             for (uint32_t i = 0; i < swap_chain_images.size(); i++) {
@@ -1123,7 +1116,7 @@ namespace Craftbuild {
             }
         }
 
-        void create_command_pool() {
+        inline void create_command_pool() {
             QueueFamilyIndices queue_family_indices = find_queue_families(physical_device);
 
             VkCommandPoolCreateInfo pool_info{};
@@ -1136,14 +1129,14 @@ namespace Craftbuild {
             }
         }
 
-        void create_color_resources() {
+        inline void create_color_resources() {
             VkFormat color_format = swap_chain_image_format;
 
             create_image(swap_chain_extent.width, swap_chain_extent.height, 1, msaa_samples, color_format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, color_image, color_image_memory);
             color_image_view = create_image_view(color_image, color_format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         }
 
-        void create_depth_resources() {
+        inline void create_depth_resources() {
             VkFormat depth_format = find_depth_format();
 
             create_image(swap_chain_extent.width, swap_chain_extent.height, 1, msaa_samples, depth_format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_image, depth_image_memory);
@@ -1166,7 +1159,7 @@ namespace Craftbuild {
             throw std::runtime_error("Failed to find supported format!");
         }
 
-        VkFormat find_depth_format() {
+        inline VkFormat find_depth_format() {
             return find_supported_format(
                 { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
                 VK_IMAGE_TILING_OPTIMAL,
@@ -1174,7 +1167,7 @@ namespace Craftbuild {
             );
         }
 
-        bool has_stencil_component(VkFormat format) {
+        inline bool has_stencil_component(VkFormat format) {
             return format == VK_FORMAT_D32_SFLOAT_S8_UINT or format == VK_FORMAT_D24_UNORM_S8_UINT;
         }
 
@@ -1405,7 +1398,7 @@ namespace Craftbuild {
             end_single_time_commands(command_buffer);
         }
 
-        void load_all_textures() {
+        inline void load_all_textures() {
             for (auto type : block_types) {
                 create_texture_image(type);
                 block_texture_views[type] = create_image_view(block_textures[type], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mip_levels);
@@ -1513,7 +1506,7 @@ namespace Craftbuild {
             }
         }
 
-        void create_descriptor_pool() {
+        inline void create_descriptor_pool() {
             std::array<VkDescriptorPoolSize, 2> pool_sizes{};
             pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             pool_sizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -1615,23 +1608,18 @@ namespace Craftbuild {
                 mesh_ready.store(false);
             }
 
-            vkDeviceWaitIdle(device);
-
             all_vertices_size = all_vertices.size();
             all_indices_size = all_indices.size();
 
             create_vertex_buffer(all_vertices);
             create_index_buffer(all_indices);
 
-            if (!block_texture_views.empty()) {
-                update_descriptor_sets();
-            }
-
+            create_descriptor_sets();
             create_command_buffers();
             create_sync_objects();
         }
 
-        VkCommandBuffer begin_single_time_commands() {
+        VkCommandBuffer begin_single_time_commands() const {
             VkCommandBufferAllocateInfo alloc_info{};
             alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
             alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -1649,7 +1637,7 @@ namespace Craftbuild {
             return command_buffer;
         }
 
-        void end_single_time_commands(VkCommandBuffer command_buffer) {
+        void end_single_time_commands(VkCommandBuffer command_buffer) const {
             vkEndCommandBuffer(command_buffer);
 
             VkSubmitInfo submit_info{};
@@ -1662,7 +1650,7 @@ namespace Craftbuild {
             vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
         }
 
-        void copy_buffer(VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size) {
+        inline void copy_buffer(VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size) {
             VkCommandBuffer command_buffer = begin_single_time_commands();
             VkBufferCopy copy_region{};
             copy_region.size = size;
@@ -1681,7 +1669,7 @@ namespace Craftbuild {
             throw std::runtime_error("Failed to find suitable memory type!");
         }
 
-        void create_command_buffers() {
+        inline void create_command_buffers() {
             command_buffers.resize(MAX_FRAMES_IN_FLIGHT);
             VkCommandBufferAllocateInfo alloc_info{};
             alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1734,6 +1722,7 @@ namespace Craftbuild {
             vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
             if (all_vertices_size and all_indices_size and vertex_buffer != nullptr and index_buffer != nullptr) {
+
                 VkBuffer vertex_buffers[] = { vertex_buffer };
                 VkDeviceSize offsets[] = { 0 };
 
@@ -1777,7 +1766,7 @@ namespace Craftbuild {
             }
         }
 
-        void update_uniform_buffer(uint32_t current_image) {
+        inline void recreate_uniform_buffer(uint32_t current_image) {
             static auto start_time = std::chrono::high_resolution_clock::now();
             auto current_time = std::chrono::high_resolution_clock::now();
             float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
@@ -1791,7 +1780,7 @@ namespace Craftbuild {
             memcpy(uniform_buffers_mapped[current_image], &ubo, sizeof(ubo));
         }
 
-        void update_descriptor_sets() {
+        void recreate_descriptor_sets() {
             for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 VkDescriptorBufferInfo buffer_info{};
                 buffer_info.buffer = uniform_buffers[i];
@@ -1859,13 +1848,13 @@ namespace Craftbuild {
             create_index_buffer(all_indices);
 
             if (!block_texture_views.empty()) {
-                update_descriptor_sets();
+                recreate_descriptor_sets();
             }
 
             recreate_command_buffers();
         }
 
-        void recreate_command_buffers() {
+        inline void recreate_command_buffers() {
             vkFreeCommandBuffers(device, command_pool, static_cast<uint32_t>(command_buffers.size()), command_buffers.data());
             create_command_buffers();
         }
@@ -1889,7 +1878,7 @@ namespace Craftbuild {
 
             images_in_flight[image_index] = in_flight_fences[current_frame];
 
-            update_uniform_buffer(current_frame);
+            recreate_uniform_buffer(current_frame);
             vkResetFences(device, 1, &in_flight_fences[current_frame]);
             vkResetCommandBuffer(command_buffers[current_frame], 0);
             record_command_buffer(command_buffers[current_frame], image_index);
@@ -1935,7 +1924,7 @@ namespace Craftbuild {
             current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
         }
 
-        VkShaderModule create_shader_module(const std::vector<char>& code) {
+        inline VkShaderModule create_shader_module(const std::vector<char>& code) {
             VkShaderModuleCreateInfo create_info{};
             create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
             create_info.codeSize = code.size();
@@ -1966,7 +1955,7 @@ namespace Craftbuild {
             return VK_PRESENT_MODE_FIFO_KHR;
         }
 
-        VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities) {
+        inline VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities) {
             if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
                 return capabilities.currentExtent;
             }
@@ -2001,7 +1990,7 @@ namespace Craftbuild {
             return details;
         }
 
-        bool is_device_suitable(VkPhysicalDevice device) {
+        inline bool is_device_suitable(VkPhysicalDevice device) {
             QueueFamilyIndices indices = find_queue_families(device);
             bool extensions_supported = check_device_extension_support(device);
             bool swap_chain_adequate = false;
@@ -2050,7 +2039,7 @@ namespace Craftbuild {
             return indices;
         }
 
-        std::vector<const char*> get_required_extensions() {
+        inline std::vector<const char*> get_required_extensions() {
             uint32_t glfw_extension_count = 0;
             const char** glfw_extensions;
             glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
@@ -2081,7 +2070,7 @@ namespace Craftbuild {
             return true;
         }
 
-        static std::vector<char> read_file(const std::string& filename) {
+        inline static std::vector<char> read_file(const std::string& filename) {
             std::ifstream file(filename, std::ios::ate | std::ios::binary);
             if (!file.is_open()) {
                 throw std::runtime_error("Failed to open file!");

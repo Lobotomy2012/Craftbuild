@@ -335,9 +335,8 @@ namespace Craftbuild {
             decorate_surface(chunk, biome);
         }
 
-        void set_seed(int new_seed) {
-            seed = new_seed;
-            continentalness = PerlinNoise(seed + 0);
+        void set_seed(int seed) {
+            continentalness = PerlinNoise(seed);
             erosion = PerlinNoise(seed + 1);
             peaks_valleys = PerlinNoise(seed + 2);
             weirdness = PerlinNoise(seed + 3);
