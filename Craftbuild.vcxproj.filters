@@ -44,5 +44,8 @@
     <ClInclude Include="Game\Craftbuild\Include\Graphics\function.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\World\variable.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

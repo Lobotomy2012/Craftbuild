@@ -3,6 +3,7 @@
 #include <core.hpp>
 #include <World/enum.hpp>
 #include <World/struct.hpp>
+#include <World/variable.hpp>
 
 namespace Craftbuild {
     class Frustum {
@@ -69,19 +70,19 @@ namespace Craftbuild {
             }
         public:
             PerlinNoise(int seed = 0) {
-                permutation.resize(512);
-                std::vector<int> p(256);
-                for (int i = 0; i < 256; ++i) p[i] = i;
+                permutation.resize(WORLD_HEIGHT * 2);
+                std::vector<int> p(WORLD_HEIGHT);
+                for (int i = 0; i < WORLD_HEIGHT; ++i) p[i] = i;
                 std::mt19937 engine(seed);
                 std::shuffle(p.begin(), p.end(), engine);
-                for (int i = 0; i < 256; ++i) {
-                    permutation[i] = permutation[i + 256] = p[i];
+                for (int i = 0; i < WORLD_HEIGHT; ++i) {
+                    permutation[i] = permutation[i + WORLD_HEIGHT] = p[i];
                 }
             }
             double noise(double x, double y, double z) const {
-                int X = static_cast<int>(floor(x)) & 255;
-                int Y = static_cast<int>(floor(y)) & 255;
-                int Z = static_cast<int>(floor(z)) & 255;
+                int X = static_cast<int>(floor(x)) & (WORLD_HEIGHT - 1);
+                int Y = static_cast<int>(floor(y)) & (WORLD_HEIGHT - 1);
+                int Z = static_cast<int>(floor(z)) & (WORLD_HEIGHT - 1);
                 x -= floor(x); y -= floor(y); z -= floor(z);
                 double u = fade(x), v = fade(y), w = fade(z);
                 int A = permutation[X] + Y, AA = permutation[A] + Z, AB = permutation[A + 1] + Z;
@@ -328,7 +329,7 @@ namespace Craftbuild {
 
         void generate_chunk(Chunk& chunk) {
             generate_terrain(chunk);
-            BiomeType biome = get_biome(chunk.x * 16 + 8, chunk.z * 16 + 8);
+            BiomeType biome = get_biome(chunk.x * CHUNK_SIZE + (CHUNK_SIZE / 2), chunk.z * CHUNK_SIZE + (CHUNK_SIZE / 2));
             generate_caves(chunk);
             generate_trees(chunk);
             decorate_surface(chunk, biome);

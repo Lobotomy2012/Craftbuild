@@ -9,23 +9,26 @@
 namespace Craftbuild {
     class CraftbuildGraphics {
     public:
-        CraftbuildGraphics() {
+        CraftbuildGraphics() : vertex_buffer(nullptr), index_buffer(nullptr) {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<> dist(1, 1'000'000'000);
-		    const int seed = dist(gen);
+            const int seed = dist(gen);
             std::cerr << "\033[96m[Game]\033[36m Seed set to " << seed << "\n";
             world.set_seed(seed);
 
-            init_window();
-            init_vulkan();
             std::cerr << "\033[96m[Game]\033[36m Generating World\n";
             generate_world_mesh();
             std::cerr << "\033[96m[Game]\033[36m Done! Have fun\n";
+
+            init_window();
+            init_vulkan();
             init_input();
             main_loop();
         }
         ~CraftbuildGraphics() {
+            vkDeviceWaitIdle(device);
+
             cleanup_swap_chain();
 
             vkDestroyPipeline(device, graphics_pipeline, nullptr);
@@ -53,8 +56,8 @@ namespace Craftbuild {
             }
 
             // Cleanup texture atlas
-            vkDestroyImageView(device, texture_atlas_view, nullptr);
-            vkDestroyImage(device, texture_atlas_image, nullptr);
+            if (texture_atlas_view) vkDestroyImageView(device, texture_atlas_view, nullptr);
+            if (texture_atlas_image) vkDestroyImage(device, texture_atlas_image, nullptr);
             vkFreeMemory(device, texture_atlas_memory, nullptr);
 
             vkDestroyDescriptorSetLayout(device, descriptor_set_layout, nullptr);
@@ -91,7 +94,7 @@ namespace Craftbuild {
         VkInstance instance;
         VkDebugUtilsMessengerEXT debug_messenger;
         VkSurfaceKHR surface;
-        VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+        VkPhysicalDevice physical_device = nullptr;
         VkSampleCountFlagBits msaa_samples = VK_SAMPLE_COUNT_1_BIT;
         VkDevice device;
         VkQueue graphics_queue;
@@ -144,7 +147,7 @@ namespace Craftbuild {
         bool framebuffer_resized = false;
         bool escape_pressed_last_frame = false;
         World world;
-        
+
         std::unordered_map<int64_t, Chunk> chunk_map;
         glm::vec3 camera_pos = glm::vec3(0.0f, 70.0f, 0.0f);
         glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -165,13 +168,15 @@ namespace Craftbuild {
         std::unordered_map<BlockType, VkDeviceMemory> block_textures_memory;
         std::unordered_map<BlockType, VkImageView> block_texture_views;
 
-        VkImage texture_atlas_image;
-        VkDeviceMemory texture_atlas_memory;
-        VkImageView texture_atlas_view;
+        VkImage texture_atlas_image = nullptr;
+        VkDeviceMemory texture_atlas_memory = nullptr;
+        VkImageView texture_atlas_view = nullptr;
 
         std::mutex mesh_mutex;
         std::atomic<bool> mesh_ready = false;
         std::atomic<bool> generating_mesh = false;
+        std::vector<Vertex> pending_vertices;
+        std::vector<uint32_t> pending_indices;
 
         void init_window() {
             glfwInit();
@@ -206,8 +211,6 @@ namespace Craftbuild {
             create_uniform_buffers();
             create_descriptor_pool();
             create_descriptor_sets();
-            create_command_buffers();
-            create_sync_objects();
         }
 
         void init_input() {
@@ -306,7 +309,7 @@ namespace Craftbuild {
             // Build set of desired chunk keys within render distance
             auto make_key = [](int x, int z) -> int64_t {
                 return (static_cast<int64_t>(x) << 32) | static_cast<uint32_t>(z);
-            };
+                };
 
             std::unordered_set<int64_t> desired_keys;
             desired_keys.reserve((render_distance * 2 + 1) * (render_distance * 2 + 1));
@@ -371,15 +374,44 @@ namespace Craftbuild {
                     vertices_sum.fetch_add(chunk->vertices.size());
                     indices_sum.fetch_add(chunk->indices.size());
                 }
-            };
+                };
 
             for (unsigned int t = 0; t < thread_count; ++t) threads.emplace_back(worker);
             for (auto& t : threads) t.join();
 
-            all_vertices_size = vertices_sum.load();
-            all_indices_size = indices_sum.load();
             size_t total_generated = generated_count.load();
 
+            std::vector<Vertex> combined_vertices;
+            std::vector<uint32_t> combined_indices;
+            combined_vertices.reserve(vertices_sum.load());
+            combined_indices.reserve(indices_sum.load());
+
+            uint32_t vertex_offset = 0;
+            std::vector<Chunk*> chunks;
+            chunks.reserve(chunk_map.size());
+            for (auto& [k, c] : chunk_map) chunks.push_back(&c);
+            std::sort(chunks.begin(), chunks.end(), [&](Chunk* a, Chunk* b) {
+                int ax = a->x, az = a->z;
+                int bx = b->x, bz = b->z;
+                int px = static_cast<int>(camera_pos.x) / 16;
+                int pz = static_cast<int>(camera_pos.z) / 16;
+                return (std::abs(ax - px) + std::abs(az - pz)) < (std::abs(bx - px) + std::abs(bz - pz));
+                });
+
+            for (const auto* chunk_ptr : chunks) {
+                const Chunk& chunk = *chunk_ptr;
+                combined_vertices.insert(combined_vertices.end(), chunk.vertices.begin(), chunk.vertices.end());
+                for (uint32_t idx : chunk.indices) {
+                    combined_indices.push_back(idx + vertex_offset);
+                }
+                vertex_offset += static_cast<uint32_t>(chunk.vertices.size());
+            }
+
+            all_vertices_size = combined_vertices.size();
+            all_indices_size = combined_indices.size();
+
+            pending_vertices = std::move(combined_vertices);
+            pending_indices = std::move(combined_indices);
             mesh_ready.store(true);
 
             if (enable_validation_layers) {
@@ -400,9 +432,9 @@ namespace Craftbuild {
 
             std::unordered_map<Vertex, uint32_t> vert_map;
 
-            for (int lx = 0; lx < 16; lx++) {
-                for (int ly = 0; ly < 383; ly++) {
-                    for (int lz = 0; lz < 16; lz++) {
+            for (int lx = 0; lx < CHUNK_SIZE; lx++) {
+                for (int ly = 0; ly < WORLD_HEIGHT; ly++) {
+                    for (int lz = 0; lz < CHUNK_SIZE; lz++) {
                         BlockType block_type = chunk.blocks[lx][ly][lz];
                         if (block_type == BlockType::AIR || block_type == BlockType::WATER) {
                             continue;
@@ -550,14 +582,14 @@ namespace Craftbuild {
             case BlockFace::EAST: nx++; break;
             case BlockFace::WEST: nx--; break;
             }
-            if (nx < 0 or nx >= 16 or nz < 0 or nz >= 16 or ny < 0 or ny >= 383) {
+            if (nx < 0 or nx >= CHUNK_SIZE or nz < 0 or nz >= CHUNK_SIZE or ny < 0 or ny >= WORLD_HEIGHT) {
                 return true;
             }
             BlockType neighbor = chunk.blocks[nx][ny][nz];
             return (neighbor == BlockType::AIR or neighbor == BlockType::WATER or neighbor == BlockType::LEAVES);
         }
 
-        void update_generate_world() {
+        void regenerate_world() {
             while (!glfwWindowShouldClose(window)) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(16));
                 static int last_chunk_x = INT_MAX;
@@ -573,7 +605,7 @@ namespace Craftbuild {
             }
         }
 
-        void update_process_input() {
+        void reprocess_input() {
             while (!glfwWindowShouldClose(window)) {
                 // delta time
                 float current_frame = glfwGetTime();
@@ -584,15 +616,16 @@ namespace Craftbuild {
         }
 
         void main_loop() {
-            std::thread mesh_thread(&CraftbuildGraphics::update_generate_world, this);
-            std::thread input_thread(&CraftbuildGraphics::update_process_input, this);
+            std::thread mesh_thread(&CraftbuildGraphics::regenerate_world, this);
+            std::thread input_thread(&CraftbuildGraphics::reprocess_input, this);
+
+            create_buffers();
+
             while (!glfwWindowShouldClose(window)) {
                 glfwPollEvents();
 
                 if (mesh_ready.load()) {
-                    std::lock_guard<std::mutex> lock(mesh_mutex);
-                    update_buffers();
-                    mesh_ready.store(false);
+                    recreate_buffers();
                 }
 
                 draw_frame();
@@ -723,7 +756,7 @@ namespace Craftbuild {
                 }
             }
 
-            if (physical_device == VK_NULL_HANDLE) {
+            if (physical_device == nullptr) {
                 throw std::runtime_error("Failed to find a suitable GPU!");
             }
         }
@@ -933,7 +966,7 @@ namespace Craftbuild {
 
             VkDescriptorSetLayoutBinding sampler_layout_binding{};
             sampler_layout_binding.binding = 1;
-            sampler_layout_binding.descriptorCount = 12;
+            sampler_layout_binding.descriptorCount = TEXTURE_AMOUNT;
             sampler_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             sampler_layout_binding.pImmutableSamplers = nullptr;
             sampler_layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1059,9 +1092,9 @@ namespace Craftbuild {
             pipeline_info.layout = pipeline_layout;
             pipeline_info.renderPass = render_pass;
             pipeline_info.subpass = 0;
-            pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
+            pipeline_info.basePipelineHandle = nullptr;
 
-            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &graphics_pipeline) != VK_SUCCESS) {
+            if (vkCreateGraphicsPipelines(device, nullptr, 1, &pipeline_info, nullptr, &graphics_pipeline) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to create graphics pipeline!");
             }
 
@@ -1373,21 +1406,6 @@ namespace Craftbuild {
         }
 
         void load_all_textures() {
-            std::vector<BlockType> block_types = {
-                BlockType::GRASS,
-                BlockType::DIRT,
-                BlockType::STONE,
-                BlockType::DIAMOND_BLOCK,
-                BlockType::WATER,
-                BlockType::SAND,
-                BlockType::WOOD,
-                BlockType::LEAVES,
-                BlockType::BEDROCK,
-                BlockType::GRAVEL,
-                BlockType::SNOW,
-                BlockType::GRASS_PLANT
-            };
-
             for (auto type : block_types) {
                 create_texture_image(type);
                 block_texture_views[type] = create_image_view(block_textures[type], VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mip_levels);
@@ -1500,7 +1518,7 @@ namespace Craftbuild {
             pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             pool_sizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
             pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            pool_sizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 12;
+            pool_sizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * TEXTURE_AMOUNT;
             VkDescriptorPoolCreateInfo pool_info{};
             pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
             pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
@@ -1523,20 +1541,7 @@ namespace Craftbuild {
                 throw std::runtime_error("Failed to allocate descriptor sets!");
             }
             std::vector<VkDescriptorImageInfo> image_infos;
-            std::vector<BlockType> block_types = {
-                BlockType::GRASS,
-                BlockType::DIRT,
-                BlockType::STONE,
-                BlockType::DIAMOND_BLOCK,
-                BlockType::WATER,
-                BlockType::SAND,
-                BlockType::WOOD,
-                BlockType::LEAVES,
-                BlockType::BEDROCK,
-                BlockType::GRAVEL,
-                BlockType::SNOW,
-                BlockType::GRASS_PLANT
-            };
+
             for (auto type : block_types) {
                 VkDescriptorImageInfo image_info{};
                 image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1599,6 +1604,33 @@ namespace Craftbuild {
             vkBindBufferMemory(device, buffer, buffer_memory, 0);
         }
 
+        void create_buffers() {
+            std::vector<Vertex> all_vertices;
+            std::vector<uint32_t> all_indices;
+            {
+                std::lock_guard<std::mutex> lock(mesh_mutex);
+                if (!mesh_ready.load()) return;
+                all_vertices.swap(pending_vertices);
+                all_indices.swap(pending_indices);
+                mesh_ready.store(false);
+            }
+
+            vkDeviceWaitIdle(device);
+
+            all_vertices_size = all_vertices.size();
+            all_indices_size = all_indices.size();
+
+            create_vertex_buffer(all_vertices);
+            create_index_buffer(all_indices);
+
+            if (!block_texture_views.empty()) {
+                update_descriptor_sets();
+            }
+
+            create_command_buffers();
+            create_sync_objects();
+        }
+
         VkCommandBuffer begin_single_time_commands() {
             VkCommandBufferAllocateInfo alloc_info{};
             alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1625,7 +1657,7 @@ namespace Craftbuild {
             submit_info.commandBufferCount = 1;
             submit_info.pCommandBuffers = &command_buffer;
 
-            vkQueueSubmit(graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+            vkQueueSubmit(graphics_queue, 1, &submit_info, nullptr);
             vkQueueWaitIdle(graphics_queue);
             vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
         }
@@ -1701,7 +1733,7 @@ namespace Craftbuild {
 
             vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-            if (all_vertices_size and all_indices_size and vertex_buffer != VK_NULL_HANDLE and index_buffer != VK_NULL_HANDLE) {
+            if (all_vertices_size and all_indices_size and vertex_buffer != nullptr and index_buffer != nullptr) {
                 VkBuffer vertex_buffers[] = { vertex_buffer };
                 VkDeviceSize offsets[] = { 0 };
 
@@ -1724,7 +1756,7 @@ namespace Craftbuild {
             image_available_semaphores.resize(swap_chain_images.size());
             render_finished_semaphores.resize(swap_chain_images.size());
             in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
-            images_in_flight.resize(swap_chain_images.size(), VK_NULL_HANDLE);
+            images_in_flight.resize(swap_chain_images.size(), nullptr);
 
             VkSemaphoreCreateInfo semaphore_info{};
             semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1766,20 +1798,7 @@ namespace Craftbuild {
                 buffer_info.offset = 0;
                 buffer_info.range = sizeof(UniformBufferObject);
                 std::vector<VkDescriptorImageInfo> image_infos;
-                std::vector<BlockType> block_types = {
-                    BlockType::GRASS,
-                    BlockType::DIRT,
-                    BlockType::STONE,
-                    BlockType::DIAMOND_BLOCK,
-                    BlockType::WATER,
-                    BlockType::SAND,
-                    BlockType::WOOD,
-                    BlockType::LEAVES,
-                    BlockType::BEDROCK,
-                    BlockType::GRAVEL,
-                    BlockType::SNOW,
-                    BlockType::GRASS_PLANT
-                };
+
                 for (auto type : block_types) {
                     VkDescriptorImageInfo image_info{};
                     image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1806,8 +1825,20 @@ namespace Craftbuild {
             }
         }
 
-        void update_buffers() {
-            if (all_vertices_size == 0 or all_indices_size == 0) {
+        void recreate_buffers() {
+            std::vector<Vertex> all_vertices;
+            std::vector<uint32_t> all_indices;
+            {
+                std::lock_guard<std::mutex> lock(mesh_mutex);
+                if (!mesh_ready.load()) return;
+                all_vertices.swap(pending_vertices);
+                all_indices.swap(pending_indices);
+                mesh_ready.store(false);
+            }
+
+            if (all_vertices.empty() or all_indices.empty()) {
+                all_vertices_size = 0;
+                all_indices_size = 0;
                 if (enable_validation_layers) {
                     std::cerr << "\033[93m[Warning]\033[33m No vertices or indices to render, skipping buffer update.\n";
                 }
@@ -1820,33 +1851,6 @@ namespace Craftbuild {
             vkFreeMemory(device, vertex_buffer_memory, nullptr);
             vkDestroyBuffer(device, index_buffer, nullptr);
             vkFreeMemory(device, index_buffer_memory, nullptr);
-
-            std::vector<Vertex> all_vertices;
-            std::vector<uint32_t> all_indices;
-
-            all_vertices.reserve(all_vertices_size);
-            all_indices.reserve(all_indices_size);
-
-            uint32_t vertex_offset = 0;
-            std::vector<Chunk*> chunks;
-            chunks.reserve(chunk_map.size());
-            for (auto& [k, c] : chunk_map) chunks.push_back(&c);
-            std::sort(chunks.begin(), chunks.end(), [&](Chunk* a, Chunk* b) {
-                int ax = a->x, az = a->z;
-                int bx = b->x, bz = b->z;
-                int px = static_cast<int>(camera_pos.x) / 16;
-                int pz = static_cast<int>(camera_pos.z) / 16;
-                return (std::abs(ax - px) + std::abs(az - pz)) < (std::abs(bx - px) + std::abs(bz - pz));
-            });
-
-            for (const auto* chunk_ptr : chunks) {
-                const Chunk& chunk = *chunk_ptr;
-                all_vertices.insert(all_vertices.end(), chunk.vertices.begin(), chunk.vertices.end());
-                for (uint32_t idx : chunk.indices) {
-                    all_indices.push_back(idx + vertex_offset);
-                }
-                vertex_offset += static_cast<uint32_t>(chunk.vertices.size());
-            }
 
             all_vertices_size = all_vertices.size();
             all_indices_size = all_indices.size();
@@ -1870,7 +1874,7 @@ namespace Craftbuild {
             vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
 
             uint32_t image_index;
-            VkResult result = vkAcquireNextImageKHR(device, swap_chain, UINT64_MAX, image_available_semaphores[current_frame], VK_NULL_HANDLE, &image_index);
+            VkResult result = vkAcquireNextImageKHR(device, swap_chain, UINT64_MAX, image_available_semaphores[current_frame], nullptr, &image_index);
 
             if (result == VK_ERROR_OUT_OF_DATE_KHR) {
                 recreate_swap_chain();
@@ -1879,7 +1883,7 @@ namespace Craftbuild {
             else if (result != VK_SUCCESS and result != VK_SUBOPTIMAL_KHR) {
                 throw std::runtime_error("Failed to acquire swap chain image!");
             }
-            if (images_in_flight[image_index] != VK_NULL_HANDLE) {
+            if (images_in_flight[image_index] != nullptr) {
                 vkWaitForFences(device, 1, &images_in_flight[image_index], VK_TRUE, UINT64_MAX);
             }
 

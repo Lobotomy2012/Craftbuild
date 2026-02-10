@@ -16,6 +16,7 @@ namespace Craftbuild {
         GRAVEL,
         SNOW,
         GRASS_PLANT,
+        GLASS,
         AIR = 255
     };
 
