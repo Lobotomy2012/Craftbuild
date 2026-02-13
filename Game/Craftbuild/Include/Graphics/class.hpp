@@ -1,8 +1,8 @@
 #pragma once
 
 #include <core.hpp>
-#include <World/world.hpp>
-#include <Player/player.hpp>
+#include <World/class.hpp>
+#include <Player/class.hpp>
 #include <Graphics/variable.hpp>
 #include <Graphics/struct.hpp>
 #include <Graphics/function.hpp>

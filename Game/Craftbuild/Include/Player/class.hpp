@@ -3,7 +3,7 @@
 #include <core.hpp>
 #include <Graphics/variable.hpp>
 #include <Player/enum.hpp>
-#include <World/World.hpp>
+#include <World/class.hpp>
 #include <Player/variable.hpp>
 
 namespace Craftbuild {

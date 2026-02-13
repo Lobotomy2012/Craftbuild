@@ -33,11 +33,4 @@ namespace Craftbuild {
         JUNGLE,
         SAVANNA
     };
-
-    enum class LODLevel {
-        LEVEL_0 = 0,
-        LEVEL_1,
-        LEVEL_2,
-        LEVEL_3,
-    };
 }
