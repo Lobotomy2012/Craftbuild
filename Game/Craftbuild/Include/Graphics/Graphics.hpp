@@ -2,6 +2,7 @@
 
 #include <core.hpp>
 #include <World/world.hpp>
+#include <Player/player.hpp>
 #include <Graphics/variable.hpp>
 #include <Graphics/struct.hpp>
 #include <Graphics/function.hpp>
@@ -10,16 +11,60 @@ namespace Craftbuild {
     class CraftbuildGraphics {
     public:
         CraftbuildGraphics() {
-            std::random_device rd;
-            std::mt19937 gen(rd());
-            std::uniform_int_distribution<> dist(1, 1'000'000'000);
-            const int seed = dist(gen);
-            std::cerr << "\033[96m[Game]\033[36m Seed set to " << seed << "\n";
-            world.set_seed(seed);
+            std::ifstream overworld_load("Game/Craftbuild/Save/overworld.cbsave");
+            if (overworld_load) {
+                std::cout << "\033[96m[Game]\033[36m Loading World...\n";
 
-            std::cerr << "\033[96m[Game]\033[36m Generating World\n";
+                int seed = 0;
+                overworld_load.read(reinterpret_cast<char*>(&seed), sizeof(seed));
+                world.set_seed(seed);
+
+				size_t chunk_count = 0;
+				overworld_load.read(reinterpret_cast<char*>(&chunk_count), sizeof(chunk_count));
+
+                bool success = true;
+                for (size_t _ = 0; _ < chunk_count; ++_) {
+                    int64_t key;
+                    if (!overworld_load.read(reinterpret_cast<char*>(&key), sizeof(key))) {
+                        std::cout << "\033[91m[Game]\033[31m Failed to load chunk key\n";
+                        success = false;
+                        break;
+                    }
+                    Chunk chunk;
+                    if (!(overworld_load >> chunk)) {
+                        std::cout << "\033[91m[Game]\033[31m Failed to load chunk\n";
+                        success = false;
+                        break;
+                    }
+                    chunk_map.emplace(key, std::move(chunk));
+                }
+
+                if (success) {
+                    if (!(overworld_load >> main_player)) {
+                        std::cout << "\033[91m[Game]\033[31m Failed to load main player\n";
+                        success = false;
+                    }
+                }
+
+                overworld_load.close();
+
+                if (!success) {
+                    chunk_map.clear();
+                }
+            }
+            else {
+                std::random_device rd;
+                std::mt19937 gen(rd());
+                std::uniform_int_distribution<> dist(1, 1'000'000'000);
+                const int seed = dist(gen);
+                std::cout << "\033[96m[Game]\033[36m Seed set to " << seed << "\n";
+                world.set_seed(seed);
+            }
+
+            std::cout << "\033[96m[Game]\033[36m Generating World...\n";
             generate_world_mesh();
-            std::cerr << "\033[96m[Game]\033[36m Done! Have fun\n";
+
+            std::cout << "\033[96m[Game]\033[36m Done! Have fun\n";
 
             init_window();
             init_vulkan();
@@ -61,9 +106,9 @@ namespace Craftbuild {
             vkFreeMemory(device, texture_atlas_memory, nullptr);
 
             vkDestroyDescriptorSetLayout(device, descriptor_set_layout, nullptr);
-            vkDestroyBuffer(device, vertex_buffer, nullptr);
+            vkDestroyBuffer(device, vertex_buffer.second, nullptr);
             vkFreeMemory(device, vertex_buffer_memory, nullptr);
-            vkDestroyBuffer(device, index_buffer, nullptr);
+            vkDestroyBuffer(device, index_buffer.second, nullptr);
             vkFreeMemory(device, index_buffer_memory, nullptr);
 
             for (size_t i = 0; i < image_available_semaphores.size(); i++) {
@@ -77,17 +122,32 @@ namespace Craftbuild {
             vkDestroyCommandPool(device, command_pool, nullptr);
             vkDestroyDevice(device, nullptr);
 
-            if (enable_validation_layers) {
-                destroy_debug_utils_messenger_ext(instance, debug_messenger, nullptr);
-            }
+            if (enable_validation_layers) destroy_debug_utils_messenger_ext(instance, debug_messenger, nullptr);
 
             vkDestroySurfaceKHR(instance, surface, nullptr);
             vkDestroyInstance(instance, nullptr);
 
-            chunk_map.clear();
-
             glfwDestroyWindow(window);
             glfwTerminate();
+
+			std::cout << "\033[96m[Game]\033[36m Saving World...\n";
+            std::ofstream overworld_save("Game/Craftbuild/Save/overworld.cbsave", std::ios::binary);
+            overworld_save.clear();
+
+            const auto seed = world.get_seed();
+            overworld_save.write(reinterpret_cast<const char*>(&seed), sizeof(seed));
+
+            const auto chunk_count = chunk_map.size();
+            overworld_save.write(reinterpret_cast<const char*>(&chunk_count), sizeof(chunk_count));
+
+            for (const auto& [key, chunk] : chunk_map) {
+                overworld_save.write(reinterpret_cast<const char*>(&key), sizeof(key));
+                overworld_save << chunk;
+            }
+            overworld_save << main_player;
+            overworld_save.close();
+
+            chunk_map.clear();
         }
     private:
         GLFWwindow* window;
@@ -122,12 +182,10 @@ namespace Craftbuild {
         VkImageView depth_image_view;
         VkSampler texture_sampler;
 
-        VkBuffer vertex_buffer;
+        std::pair<uint32_t, VkBuffer> vertex_buffer;
         VkDeviceMemory vertex_buffer_memory;
-        VkBuffer index_buffer;
+        std::pair<uint32_t, VkBuffer> index_buffer;
         VkDeviceMemory index_buffer_memory;
-        size_t all_vertices_size = 0;
-        size_t all_indices_size = 0;
 
         std::vector<VkBuffer> uniform_buffers;
         std::vector<VkDeviceMemory> uniform_buffers_memory;
@@ -147,20 +205,13 @@ namespace Craftbuild {
         World world;
 
         std::unordered_map<int64_t, Chunk> chunk_map;
-        glm::vec3 camera_pos = glm::vec3(0.0f, 70.0f, 0.0f);
-        glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
-        glm::vec3 camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
 
-        float camera_speed = 10.0f;
-        float yaw = -90.0f;
-        float pitch = 0.0f;
+        bool keys[1024] = { false };
         float delta_time = 0.0f;
         float last_frame = 0.0f;
-        bool keys[1024] = { false };
-        bool first_mouse = true;
-        float last_x = WIDTH / 2.0f;
-        float last_y = HEIGHT / 2.0f;
-        bool pause = false;
+        float io_last_frame = 0.0f;
+
+        Player main_player;
 
         std::unordered_map<BlockType, VkImage> block_textures;
         std::unordered_map<BlockType, VkDeviceMemory> block_textures_memory;
@@ -217,6 +268,11 @@ namespace Craftbuild {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
 
+        static inline void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+            CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
+            app->main_player.scroll_callback(xoffset, yoffset);
+        }
+
         static inline void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
             CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
             if (action == GLFW_PRESS) {
@@ -229,69 +285,37 @@ namespace Craftbuild {
 
         static void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
             CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
-            if (app->first_mouse) {
-                app->last_x = xpos;
-                app->last_y = ypos;
-                app->first_mouse = false;
+            if (app->main_player.first_mouse) {
+                app->main_player.last_x = xpos;
+                app->main_player.last_y = ypos;
+                app->main_player.first_mouse = false;
             }
 
-            float xoffset = xpos - app->last_x;
-            float yoffset = app->last_y - ypos;
+            float xoffset = xpos - app->main_player.last_x;
+            float yoffset = app->main_player.last_y - ypos;
 
-            app->last_x = xpos;
-            app->last_y = ypos;
+            app->main_player.last_x = xpos;
+            app->main_player.last_y = ypos;
 
             float sensitivity = 0.1f;
 
             xoffset *= sensitivity;
             yoffset *= sensitivity;
 
-            app->yaw += xoffset;
-            app->pitch += yoffset;
+            app->main_player.yaw += xoffset;
+            app->main_player.pitch += yoffset;
 
             // make sure that when pitch is out of bounds
-            if (app->pitch > 89.0f)
-                app->pitch = 89.0f;
-            if (app->pitch < -89.0f)
-                app->pitch = -89.0f;
+            if (app->main_player.pitch > 89.0f)
+                app->main_player.pitch = 89.0f;
+            if (app->main_player.pitch < -89.0f)
+                app->main_player.pitch = -89.0f;
+
             glm::vec3 front;
-            front.x = cos(glm::radians(app->yaw)) * cos(glm::radians(app->pitch));
-            front.y = sin(glm::radians(app->pitch));
-            front.z = sin(glm::radians(app->yaw)) * cos(glm::radians(app->pitch));
-            app->camera_front = glm::normalize(front);
-        }
-
-        static inline void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-            CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
-            app->camera_speed += yoffset * 2.0f;
-            if (app->camera_speed < 1.0f) app->camera_speed = 1.0f;
-            if (app->camera_speed > 50.0f) app->camera_speed = 50.0f;
-        }
-
-        void process_input() {
-            if (keys[GLFW_KEY_ESCAPE]) {
-                if (!escape_pressed_last_frame) {
-                    pause = not pause;
-                    glfwSetInputMode(window, GLFW_CURSOR, pause ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
-                    escape_pressed_last_frame = true;
-                }
-            }
-            else {
-                escape_pressed_last_frame = false;
-            }
-            if (pause) return;
-
-            float _camera_speed = camera_speed * delta_time;
-
-            if (keys[GLFW_KEY_W]) {
-                if (keys[GLFW_KEY_LEFT_CONTROL]) _camera_speed *= 2;
-                camera_pos += _camera_speed * camera_front;
-            }
-            if (keys[GLFW_KEY_S]) camera_pos -= _camera_speed * camera_front;
-            if (keys[GLFW_KEY_A]) camera_pos -= glm::normalize(glm::cross(camera_front, camera_up)) * _camera_speed;
-            if (keys[GLFW_KEY_D]) camera_pos += glm::normalize(glm::cross(camera_front, camera_up)) * _camera_speed;
-            if (keys[GLFW_KEY_SPACE]) camera_pos += _camera_speed * camera_up;
-            if (keys[GLFW_KEY_LEFT_SHIFT]) camera_pos -= _camera_speed * camera_up;
+            front.x = cos(glm::radians(app->main_player.yaw)) * cos(glm::radians(app->main_player.pitch));
+            front.y = sin(glm::radians(app->main_player.pitch));
+            front.z = sin(glm::radians(app->main_player.yaw)) * cos(glm::radians(app->main_player.pitch));
+            app->main_player.camera_front = glm::normalize(front);
         }
 
         void generate_world_mesh() {
@@ -300,13 +324,13 @@ namespace Craftbuild {
             if (generating_mesh.load()) return;
             generating_mesh.store(true);
 
-            int player_chunk_x = static_cast<int>(camera_pos.x) / 16;
-            int player_chunk_z = static_cast<int>(camera_pos.z) / 16;
+            int player_chunk_x = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
+            int player_chunk_z = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
             constexpr int render_distance = 8;
-            // Build set of desired chunk keys within render distance
+
             auto make_key = [](int x, int z) -> int64_t {
                 return (static_cast<int64_t>(x) << 32) | static_cast<uint32_t>(z);
-                };
+            };
 
             std::unordered_set<int64_t> desired_keys;
             desired_keys.reserve((render_distance * 2 + 1) * (render_distance * 2 + 1));
@@ -390,8 +414,8 @@ namespace Craftbuild {
             std::sort(chunks.begin(), chunks.end(), [&](Chunk* a, Chunk* b) {
                 int ax = a->x, az = a->z;
                 int bx = b->x, bz = b->z;
-                int px = static_cast<int>(camera_pos.x) / 16;
-                int pz = static_cast<int>(camera_pos.z) / 16;
+                int px = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
+                int pz = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
                 return (std::abs(ax - px) + std::abs(az - pz)) < (std::abs(bx - px) + std::abs(bz - pz));
                 });
 
@@ -404,17 +428,17 @@ namespace Craftbuild {
                 vertex_offset += static_cast<uint32_t>(chunk.vertices.size());
             }
 
-            all_vertices_size = combined_vertices.size();
-            all_indices_size = combined_indices.size();
+            vertex_buffer.first = combined_vertices.size();
+            index_buffer.first = combined_indices.size();
 
             pending_vertices = std::move(combined_vertices);
             pending_indices = std::move(combined_indices);
             mesh_ready.store(true);
 
             if (enable_validation_layers) {
-                std::cerr << "\033[90m[Verbose] Generated mesh with "
-                    << all_vertices_size << " vertices, "
-                    << all_indices_size << " indices, "
+                std::cout << "\033[90m[Verbose] Generated mesh with "
+                    << index_buffer.first << " vertices, "
+                    << index_buffer.first << " indices, "
                     << total_generated << " chunks, "
                     << chunk_map.size() << " total loaded chunks\n";
             }
@@ -592,8 +616,8 @@ namespace Craftbuild {
                 static int last_chunk_x = INT_MAX;
                 static int last_chunk_z = INT_MAX;
 
-                int current_chunk_x = static_cast<int>(camera_pos.x) / 16;
-                int current_chunk_z = static_cast<int>(camera_pos.z) / 16;
+                int current_chunk_x = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
+                int current_chunk_z = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
                 if (current_chunk_x != last_chunk_x or current_chunk_z != last_chunk_z) {
                     generate_world_mesh();
                     last_chunk_x = current_chunk_x;
@@ -602,20 +626,39 @@ namespace Craftbuild {
             }
         }
 
+        void update_tick() {
+            float accumulator = 0.0f;
+            while (!glfwWindowShouldClose(window)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+                // delta time
+                float io_current_frame = glfwGetTime();
+                float io_delta_time = io_current_frame - io_last_frame;
+                io_last_frame = io_current_frame;
+
+                accumulator += io_delta_time;
+
+                while (accumulator >= FIXED_DT) {
+                    main_player.update_player(delta_time, io_current_frame, keys, chunk_map);
+                    accumulator -= FIXED_DT;
+                }
+            }
+        }
+
         void main_loop() {
             std::thread mesh_thread(&CraftbuildGraphics::regenerate_world, this);
+            std::thread tick_thread(&CraftbuildGraphics::update_tick, this);
 
             create_buffers();
 
+            glfwSwapInterval(1);
             while (!glfwWindowShouldClose(window)) {
                 glfwPollEvents();
 
                 // delta time
-                float current_frame = glfwGetTime();
-                delta_time = current_frame - last_frame;
-                last_frame = current_frame;
-
-                process_input();
+                float main_current_frame = glfwGetTime();
+                delta_time = main_current_frame - last_frame;
+                last_frame = main_current_frame;
 
                 if (mesh_ready.load()) {
                     recreate_buffers();
@@ -625,6 +668,7 @@ namespace Craftbuild {
             }
 
             if (mesh_thread.joinable()) mesh_thread.join();
+            if (tick_thread.joinable()) tick_thread.join();
         }
 
         void cleanup_swap_chain() {
@@ -1463,10 +1507,11 @@ namespace Craftbuild {
             vkMapMemory(device, staging_buffer_memory, 0, buffer_size, 0, &data);
             memcpy(data, vertices.data(), buffer_size);
             vkUnmapMemory(device, staging_buffer_memory);
+            
+            create_buffer(buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertex_buffer.second, vertex_buffer_memory);
 
-            create_buffer(buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertex_buffer, vertex_buffer_memory);
-
-            copy_buffer(staging_buffer, vertex_buffer, buffer_size);
+            vertex_buffer.first = vertices.size();
+            copy_buffer(staging_buffer, vertex_buffer.second, buffer_size);
 
             vkDestroyBuffer(device, staging_buffer, nullptr);
             vkFreeMemory(device, staging_buffer_memory, nullptr);
@@ -1484,9 +1529,10 @@ namespace Craftbuild {
             memcpy(data, indices.data(), buffer_size);
             vkUnmapMemory(device, staging_buffer_memory);
 
-            create_buffer(buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, index_buffer, index_buffer_memory);
+            create_buffer(buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, index_buffer.second, index_buffer_memory);
 
-            copy_buffer(staging_buffer, index_buffer, buffer_size);
+            index_buffer.first = indices.size();
+            copy_buffer(staging_buffer, index_buffer.second, buffer_size);
 
             vkDestroyBuffer(device, staging_buffer, nullptr);
             vkFreeMemory(device, staging_buffer_memory, nullptr);
@@ -1566,8 +1612,7 @@ namespace Craftbuild {
                 sampler_write.descriptorCount = static_cast<uint32_t>(image_infos.size());
                 sampler_write.pImageInfo = image_infos.data();
                 descriptor_writes.push_back(sampler_write);
-                vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptor_writes.size()),
-                    descriptor_writes.data(), 0, nullptr);
+                vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptor_writes.size()), descriptor_writes.data(), 0, nullptr);
             }
         }
 
@@ -1607,9 +1652,6 @@ namespace Craftbuild {
                 all_indices.swap(pending_indices);
                 mesh_ready.store(false);
             }
-
-            all_vertices_size = all_vertices.size();
-            all_indices_size = all_indices.size();
 
             create_vertex_buffer(all_vertices);
             create_index_buffer(all_indices);
@@ -1721,17 +1763,16 @@ namespace Craftbuild {
 
             vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-            if (all_vertices_size and all_indices_size and vertex_buffer != nullptr and index_buffer != nullptr) {
-
-                VkBuffer vertex_buffers[] = { vertex_buffer };
+            if (vertex_buffer.first and index_buffer.first and vertex_buffer.second != nullptr and index_buffer.second != nullptr) {
+                VkBuffer vertex_buffers[] = { vertex_buffer.second };
                 VkDeviceSize offsets[] = { 0 };
 
                 vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
 
-                vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+                vkCmdBindIndexBuffer(command_buffer, index_buffer.second, 0, VK_INDEX_TYPE_UINT32);
                 vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets[current_frame], 0, nullptr);
 
-                vkCmdDrawIndexed(command_buffer, static_cast<uint32_t>(all_indices_size), 1, 0, 0, 0);
+                vkCmdDrawIndexed(command_buffer, index_buffer.first, 1, 0, 0, 0);
             }
 
             vkCmdEndRenderPass(command_buffer);
@@ -1773,7 +1814,7 @@ namespace Craftbuild {
             UniformBufferObject ubo{};
             ubo.model = glm::mat4(1.0f);
             // Camera view matrix
-            ubo.view = glm::lookAt(camera_pos, camera_pos + camera_front, camera_up);
+            ubo.view = glm::lookAt(main_player.pos, main_player.pos + main_player.camera_front, main_player.camera_up);
             // Projection matrix
             ubo.proj = glm::perspective(glm::radians(45.0f), swap_chain_extent.width / (float)swap_chain_extent.height, 0.1f, 500.0f);
             ubo.proj[1][1] *= -1;
@@ -1826,23 +1867,20 @@ namespace Craftbuild {
             }
 
             if (all_vertices.empty() or all_indices.empty()) {
-                all_vertices_size = 0;
-                all_indices_size = 0;
+                vertex_buffer = std::make_pair(0, nullptr);
+                index_buffer = std::make_pair(0, nullptr);
                 if (enable_validation_layers) {
-                    std::cerr << "\033[93m[Warning]\033[33m No vertices or indices to render, skipping buffer update.\n";
+                    std::cout << "\033[93m[Warning]\033[33m No vertices or indices to render, skipping buffer update.\n";
                 }
                 return;
             }
 
             vkDeviceWaitIdle(device);
 
-            vkDestroyBuffer(device, vertex_buffer, nullptr);
+            vkDestroyBuffer(device, vertex_buffer.second, nullptr);
             vkFreeMemory(device, vertex_buffer_memory, nullptr);
-            vkDestroyBuffer(device, index_buffer, nullptr);
+            vkDestroyBuffer(device, index_buffer.second, nullptr);
             vkFreeMemory(device, index_buffer_memory, nullptr);
-
-            all_vertices_size = all_vertices.size();
-            all_indices_size = all_indices.size();
 
             create_vertex_buffer(all_vertices);
             create_index_buffer(all_indices);
@@ -2086,16 +2124,16 @@ namespace Craftbuild {
         static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_type, const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data, void* p_user_data) {
             CraftbuildGraphics* console = reinterpret_cast<CraftbuildGraphics*>(p_user_data);
             if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-                if (log_verbose) std::cerr << "\033[90m[Verbose] validation layer: " << p_callback_data->pMessage << "\n";
+                if (log_verbose) std::cout << "\033[90m[Verbose] validation layer: " << p_callback_data->pMessage << "\n";
             }
             else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-                std::cerr << "\033[96m[Info] validation layer:\033[36m " << p_callback_data->pMessage << "\n";
+                std::cout << "\033[96m[Info] validation layer:\033[36m " << p_callback_data->pMessage << "\n";
             }
             else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-                std::cerr << "\033[93m[Warning] validation layer:\033[33m " << p_callback_data->pMessage << "\n";
+                std::cout << "\033[93m[Warning] validation layer:\033[33m " << p_callback_data->pMessage << "\n";
             }
             else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-                std::cerr << "\033[91m[Error] validation layer:\033[31m " << p_callback_data->pMessage << "\n";
+                std::cout << "\033[91m[Error] validation layer:\033[31m " << p_callback_data->pMessage << "\n";
             }
             return VK_FALSE;
         }

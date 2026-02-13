@@ -3,6 +3,7 @@
 #include <core.hpp>
 #include <World/enum.hpp>
 #include <World/variable.hpp>
+#include <Graphics/struct.hpp>
 
 namespace Craftbuild {
     struct Block {
@@ -15,7 +16,7 @@ namespace Craftbuild {
             case BlockType::DIRT:          return "Resource/Craftbuild/Texture/Block/dirt.png";
             case BlockType::STONE:         return "Resource/Craftbuild/Texture/Block/stone.png";
             case BlockType::DIAMOND_BLOCK: return "Resource/Craftbuild/Texture/Block/diamond_block.png";
-            case BlockType::WATER:         return "Resource/Craftbuild/Texture/Block/water_still.png";
+            case BlockType::WATER:         return "Resource/Craftbuild/Texture/Block/water_overlay.png";
             case BlockType::SAND:          return "Resource/Craftbuild/Texture/Block/sand.png";
             case BlockType::WOOD:          return "Resource/Craftbuild/Texture/Block/oak_log.png";
             case BlockType::LEAVES:        return "Resource/Craftbuild/Texture/Block/oak_leaves.png";
@@ -33,7 +34,6 @@ namespace Craftbuild {
         }
     };
 
-    struct Vertex;
     struct Chunk {
         int x, z;
         BlockType blocks[CHUNK_SIZE][WORLD_HEIGHT][CHUNK_SIZE]; // 16x383x16 blocks
@@ -61,6 +61,37 @@ namespace Craftbuild {
             indices.clear();
             vertices.shrink_to_fit();
             indices.shrink_to_fit();
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const Chunk& other) {
+            const char magic[4] = { 'C','B','C','H' };
+            os.write(magic, 4);
+            int32_t cx = other.x;
+            int32_t cz = other.z;
+            os.write(reinterpret_cast<const char*>(&cx), sizeof(cx));
+            os.write(reinterpret_cast<const char*>(&cz), sizeof(cz));
+            os.write(reinterpret_cast<const char*>(other.blocks), sizeof(other.blocks));
+            return os;
+        }
+
+        friend std::istream& operator>>(std::istream& is, Chunk& other) {
+            std::streampos start_pos = is.tellg();
+            char magic[4];
+            if (!is.read(magic, 4)) return is;
+
+            const char expected[4] = { 'C','B','C','H' };
+            if (std::memcmp(magic, expected, 4) == 0) {
+                int32_t cx = 0, cz = 0;
+                is.read(reinterpret_cast<char*>(&cx), sizeof(cx));
+                is.read(reinterpret_cast<char*>(&cz), sizeof(cz));
+                // Read raw blocks
+                is.read(reinterpret_cast<char*>(other.blocks), sizeof(other.blocks));
+                other.x = cx;
+                other.z = cz;
+                other.vertices.clear();
+                other.indices.clear();
+            }
+            return is;
         }
     };
 }

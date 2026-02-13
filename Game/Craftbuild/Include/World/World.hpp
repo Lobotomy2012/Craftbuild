@@ -58,7 +58,6 @@ namespace Craftbuild {
     };
 
     class World {
-    private:
         class PerlinNoise {
             static double fade(double t) { return t * t * t * (t * (t * 6 - 15) + 10); }
             static double lerp(double t, double a, double b) { return a + t * (b - a); }
@@ -68,6 +67,7 @@ namespace Craftbuild {
                 double v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
                 return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
             }
+
         public:
             PerlinNoise(int seed = 0) {
                 permutation.resize(WORLD_HEIGHT * 2);
@@ -106,6 +106,7 @@ namespace Craftbuild {
                 }
                 return total / maxValue;
             }
+
         private:
             std::vector<int> permutation;
         };
@@ -336,6 +337,7 @@ namespace Craftbuild {
         }
 
         void set_seed(int seed) {
+            this->seed = seed;
             continentalness = PerlinNoise(seed);
             erosion = PerlinNoise(seed + 1);
             peaks_valleys = PerlinNoise(seed + 2);
@@ -344,6 +346,10 @@ namespace Craftbuild {
             humidity = PerlinNoise(seed + 5);
             cave_noise = PerlinNoise(seed + 6);
             tree_noise = PerlinNoise(seed + 7);
+        }
+        
+        int get_seed() const {
+            return seed;
         }
     };
 }
