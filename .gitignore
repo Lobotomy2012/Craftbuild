@@ -362,8 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-# Resource
-Resource/
-
-# cache
-Game/Craftbuild/Shader/Cache/
+# Resource / Cache
+/Resource/
+/Game/Craftbuild/Shader/Cache/
+/Game/Craftbuild/Save/overworld.cbsave

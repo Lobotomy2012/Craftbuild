@@ -5,6 +5,7 @@
 #include <Player/enum.hpp>
 #include <World/class.hpp>
 #include <Player/variable.hpp>
+#include <Graphics/function.hpp>
 
 namespace Craftbuild {
     struct Player {
@@ -34,13 +35,63 @@ namespace Craftbuild {
                 if (speed < 1.0f) speed = 1.0f;
                 if (speed > 50.0f) speed = 50.0f;
             }
+
+        }
+
+        bool raycast_block(const std::unordered_map<int64_t, Chunk>& chunk_map, glm::ivec3& out_block, glm::ivec3& out_adjacent, float max_distance = 8.0f, float step = 0.1f) const {
+            glm::vec3 origin = pos;
+            glm::vec3 dir = glm::normalize(camera_front);
+
+            glm::ivec3 last_block = glm::ivec3(glm::floor(origin));
+
+            for (float t = 0.0f; t <= max_distance; t += step) {
+                glm::vec3 p = origin + dir * t;
+                int bx = static_cast<int>(std::floor(p.x));
+                int by = static_cast<int>(std::floor(p.y));
+                int bz = static_cast<int>(std::floor(p.z));
+
+                if (by < 0 or by >= WORLD_HEIGHT) continue;
+
+                glm::ivec3 current_block(bx, by, bz);
+                if (current_block == last_block) continue;
+                last_block = current_block;
+
+                int chunk_x = static_cast<int>(std::floor(bx / 16.0f));
+                int chunk_z = static_cast<int>(std::floor(bz / 16.0f));
+                int local_x = ((bx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                int local_z = ((bz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+
+                auto it = chunk_map.find(make_key(chunk_x, chunk_z));
+                if (it == chunk_map.end()) continue;
+
+                BlockType b = it->second.blocks[local_x][by][local_z];
+                if (b != BlockType::AIR && b != BlockType::WATER) {
+                    out_block = current_block;
+
+                    glm::vec3 prev_p = origin + dir * std::max(0.0f, t - step);
+                    int pbx = static_cast<int>(std::floor(prev_p.x));
+                    int pby = static_cast<int>(std::floor(prev_p.y));
+                    int pbz = static_cast<int>(std::floor(prev_p.z));
+                    glm::ivec3 prev_block(pbx, pby, pbz);
+                    glm::ivec3 normal = out_block - prev_block;
+
+                    if (normal == glm::ivec3(0)) {
+                        glm::vec3 local = p - (glm::vec3(bx, by, bz) + glm::vec3(0.5f));
+                        glm::vec3 abs_local = glm::abs(local);
+                        if (abs_local.x >= abs_local.y && abs_local.x >= abs_local.z) normal = glm::ivec3((local.x > 0) ? 1 : -1, 0, 0);
+                        else if (abs_local.y >= abs_local.x && abs_local.y >= abs_local.z) normal = glm::ivec3(0, (local.y > 0) ? 1 : -1, 0);
+                        else normal = glm::ivec3(0, 0, (local.z > 0) ? 1 : -1);
+                    }
+
+                    out_adjacent = out_block + normal;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         bool is_block_at_position(float x, float y, float z, const std::unordered_map<int64_t, Chunk>& chunk_map) {
-            auto make_key = [](int x, int z) -> int64_t {
-                return (static_cast<int64_t>(x) << 32) | static_cast<uint32_t>(z);
-            };
-
             int chunk_x = static_cast<int>(std::floor(x / 16.0f));
             int chunk_z = static_cast<int>(std::floor(z / 16.0f));
 
@@ -101,10 +152,6 @@ namespace Craftbuild {
                 vertical_velocity -= gravity * delta_time;
                 pos.y += vertical_velocity * delta_time;
             }
-
-            auto make_key = [](int x, int z) -> int64_t {
-                return (static_cast<int64_t>(x) << 32) | static_cast<uint32_t>(z);
-            };
 
             int chunk_x = static_cast<int>(std::floor(pos.x / 16.0f));
             int chunk_z = static_cast<int>(std::floor(pos.z / 16.0f));
@@ -167,7 +214,7 @@ namespace Craftbuild {
                 if (keys[GLFW_KEY_LEFT_SHIFT] and can_fly) pos -= velocity * camera_up;
                 else if (keys[GLFW_KEY_LEFT_SHIFT]) velocity /= 2;
 
-                if (keys[GLFW_KEY_LEFT_SHIFT] and can_fly) pos += velocity * camera_up;
+                if (keys[GLFW_KEY_SPACE] and can_fly) pos += velocity * camera_up;
                 else if (keys[GLFW_KEY_SPACE] and is_grounded) {
                     vertical_velocity = 8.5f;
                     is_grounded = false;

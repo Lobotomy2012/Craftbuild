@@ -270,8 +270,43 @@ namespace Craftbuild {
         inline void init_input() {
             glfwSetKeyCallback(window, key_callback);
             glfwSetCursorPosCallback(window, mouse_callback);
+            glfwSetMouseButtonCallback(window, mouse_button_callback);
             glfwSetScrollCallback(window, scroll_callback);
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+
+        static inline void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+            if (action != GLFW_PRESS) return;
+            auto app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
+
+            if (app->main_player.gamemode == Gamemode::Spectator or app->main_player.gamemode == Gamemode::Adventure) return;
+
+            glm::ivec3 hitBlock, placeBlock;
+            if (!app->main_player.raycast_block(app->chunk_map, hitBlock, placeBlock)) return;
+
+            auto set_block_at_world = [&](const glm::ivec3& wpos, BlockType type) {
+                int bx = wpos.x;
+                int by = wpos.y;
+                int bz = wpos.z;
+                if (by < 0 or by >= WORLD_HEIGHT) return;
+                int chunk_x = static_cast<int>(std::floor(bx / 16.0f));
+                int chunk_z = static_cast<int>(std::floor(bz / 16.0f));
+                int local_x = ((bx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                int local_z = ((bz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                auto it = app->chunk_map.find(make_key(chunk_x, chunk_z));
+                if (it == app->chunk_map.end()) return;
+                it->second.blocks[local_x][by][local_z] = type;
+                it->second.clear_mesh();
+            };
+
+            if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                set_block_at_world(hitBlock, BlockType::AIR);
+            }
+            else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                set_block_at_world(placeBlock, BlockType::DIRT);
+            }
+
+            app->generate_world_mesh();
         }
 
         static inline void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
@@ -332,35 +367,10 @@ namespace Craftbuild {
 
             int player_chunk_x = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
             int player_chunk_z = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
-            constexpr int render_distance = 8;
-
-            auto make_key = [](int x, int z) -> int64_t {
-                return (static_cast<int64_t>(x) << 32) | static_cast<uint32_t>(z);
-            };
+            constexpr int render_distance = 16;
 
             std::unordered_set<int64_t> desired_keys;
             desired_keys.reserve((render_distance * 2 + 1) * (render_distance * 2 + 1));
-            for (int dx = -render_distance; dx <= render_distance; ++dx) {
-                for (int dz = -render_distance; dz <= render_distance; ++dz) {
-                    int cx = player_chunk_x + dx;
-                    int cz = player_chunk_z + dz;
-                    desired_keys.insert(make_key(cx, cz));
-                }
-            }
-
-            // Remove chunks
-            std::vector<int64_t> to_remove;
-            to_remove.reserve(chunk_map.size());
-            for (const auto& [key, chunk] : chunk_map) {
-                if (desired_keys.find(key) == desired_keys.end()) {
-                    to_remove.push_back(key);
-                }
-            }
-            for (auto key : to_remove) {
-                chunk_map.erase(key);
-            }
-
-            // Add chunks
             for (int dx = -render_distance; dx <= render_distance; ++dx) {
                 for (int dz = -render_distance; dz <= render_distance; ++dz) {
                     int cx = player_chunk_x + dx;
@@ -374,7 +384,19 @@ namespace Craftbuild {
                         world.generate_chunk(nc);
                         chunk_map.emplace(key, std::move(nc));
                     }
+                    desired_keys.insert(key);
                 }
+            }
+
+            // Remove chunks
+            std::vector<int64_t> to_remove;
+            for (const auto& [key, chunk] : chunk_map) {
+                if (desired_keys.find(key) == desired_keys.end()) {
+                    to_remove.push_back(key);
+                }
+            }
+			for (const auto& key : to_remove) {
+                chunk_map.erase(key);
             }
 
             std::vector<Chunk*> chunk_ptrs;
@@ -401,7 +423,7 @@ namespace Craftbuild {
                     vertices_sum.fetch_add(chunk->vertices.size());
                     indices_sum.fetch_add(chunk->indices.size());
                 }
-                };
+            };
 
             for (unsigned int t = 0; t < thread_count; ++t) threads.emplace_back(worker);
             for (auto& t : threads) t.join();

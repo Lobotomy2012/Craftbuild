@@ -5,7 +5,7 @@ int main() {
 #ifdef _DEBUG
     system("glslc Game/Craftbuild/Shader/shader.vert -o Game/Craftbuild/Shader/Cache/vert.spv");
     system("glslc Game/Craftbuild/Shader/shader.frag -o Game/Craftbuild/Shader/Cache/frag.spv");
-#endif
+#endif 
 
     try {
         Craftbuild::CraftbuildGraphics();
