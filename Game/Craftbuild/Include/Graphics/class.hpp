@@ -230,6 +230,7 @@ namespace Craftbuild {
         std::mutex mesh_mutex;
         std::atomic<bool> mesh_ready = false;
         std::atomic<bool> generating_mesh = false;
+        std::atomic<bool> lod_needs_rebuild = true;
         std::vector<Vertex> pending_vertices;
         std::vector<uint32_t> pending_indices;
 
@@ -244,6 +245,7 @@ namespace Craftbuild {
         static inline void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
             auto app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
             app->framebuffer_resized = true;
+            app->lod_needs_rebuild.store(true);
         }
 
         void init_vulkan() {
@@ -416,8 +418,9 @@ namespace Craftbuild {
                     size_t i = idx.fetch_add(1);
                     if (i >= chunk_ptrs.size()) break;
                     Chunk* chunk = chunk_ptrs[i];
-                    if (chunk->vertices.empty()) {
-                        create_chunk_mesh(*chunk);
+                    if (chunk->vertices.empty() || lod_needs_rebuild.load()) {
+                        chunk->clear_mesh();
+                        create_chunk_mesh(*chunk, calculate_lod_step_for_chunk(*chunk));
                         generated_count.fetch_add(1);
                     }
                     vertices_sum.fetch_add(chunk->vertices.size());
@@ -471,21 +474,80 @@ namespace Craftbuild {
                     << chunk_map.size() << " total loaded chunks\n";
             }
 
+            lod_needs_rebuild.store(false);
             generating_mesh.store(false);
         }
 
-        void create_chunk_mesh(Chunk& chunk) {
+        int calculate_lod_step_for_chunk(const Chunk& chunk) {
+            int framebuffer_width = 0;
+            int framebuffer_height = 0;
+            glfwGetFramebufferSize(window, &framebuffer_width, &framebuffer_height);
+            if (framebuffer_width <= 0 or framebuffer_height <= 0) return 1;
+
+            const float fov = glm::radians(45.0f);
+            const glm::vec3 chunk_center(chunk.x * CHUNK_SIZE + CHUNK_SIZE * 0.5f, WORLD_HEIGHT * 0.5f, chunk.z * CHUNK_SIZE + CHUNK_SIZE * 0.5f);
+            float distance = glm::distance(main_player.pos, chunk_center);
+            distance = std::max(distance, 0.1f);
+
+            const float projected_pixel_size = framebuffer_height / (2.0f * distance * std::tan(fov * 0.5f));
+
+            if (projected_pixel_size >= 18.0f) return 1;
+            if (projected_pixel_size >= 9.0f) return 2;
+            if (projected_pixel_size >= 4.0f) return 4;
+            return 8;
+        }
+
+        BlockType sample_block_type(const Chunk& chunk, int start_x, int start_y, int start_z, int lod_step) {
+            for (int x = start_x; x < std::min(start_x + lod_step, CHUNK_SIZE); ++x) {
+                for (int y = start_y; y < std::min(start_y + lod_step, WORLD_HEIGHT); ++y) {
+                    for (int z = start_z; z < std::min(start_z + lod_step, CHUNK_SIZE); ++z) {
+                        BlockType type = chunk.blocks[x][y][z];
+                        if (type != BlockType::AIR and type != BlockType::WATER) return type;
+                    }
+                }
+            }
+            return BlockType::AIR;
+        }
+
+        bool is_lod_cell_solid(const Chunk& chunk, int start_x, int start_y, int start_z, int lod_step) {
+            return sample_block_type(chunk, start_x, start_y, start_z, lod_step) != BlockType::AIR;
+        }
+
+        enum class BlockFace {
+            TOP, BOTTOM, NORTH, SOUTH, EAST, WEST
+        };
+
+        bool should_render_block_face_lod(const Chunk& chunk, int x, int y, int z, int lod_step, BlockFace face) {
+            int nx = x, ny = y, nz = z;
+            switch (face) {
+            case BlockFace::TOP: ny += lod_step; break;
+            case BlockFace::BOTTOM: ny -= lod_step; break;
+            case BlockFace::NORTH: nz += lod_step; break;
+            case BlockFace::SOUTH: nz -= lod_step; break;
+            case BlockFace::EAST: nx += lod_step; break;
+            case BlockFace::WEST: nx -= lod_step; break;
+            }
+
+            if (nx < 0 or nx >= CHUNK_SIZE or nz < 0 or nz >= CHUNK_SIZE or ny < 0 or ny >= WORLD_HEIGHT) {
+                return true;
+            }
+
+            return !is_lod_cell_solid(chunk, nx, ny, nz, lod_step);
+        }
+
+        void create_chunk_mesh(Chunk& chunk, int lod_step = 1) {
             // Pre-calculate chunk offset
             float ox = chunk.x * 16.0f;
             float oz = chunk.z * 16.0f;
 
             std::unordered_map<Vertex, uint32_t> vert_map;
 
-            for (int lx = 0; lx < CHUNK_SIZE; lx++) {
-                for (int ly = 0; ly < WORLD_HEIGHT; ly++) {
-                    for (int lz = 0; lz < CHUNK_SIZE; lz++) {
-                        BlockType block_type = chunk.blocks[lx][ly][lz];
-                        if (block_type == BlockType::AIR || block_type == BlockType::WATER) {
+            const int step = std::max(1, lod_step);
+            for (int lx = 0; lx < CHUNK_SIZE; lx += step) {
+                for (int ly = 0; ly < WORLD_HEIGHT; ly += step) {
+                    for (int lz = 0; lz < CHUNK_SIZE; lz += step) {
+                        BlockType block_type = sample_block_type(chunk, lx, ly, lz, step);
+                        if (block_type == BlockType::AIR) {
                             continue;
                         }
 
@@ -493,12 +555,13 @@ namespace Craftbuild {
                         float wy = ly;
                         float wz = oz + lz;
 
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::TOP)) add_face_top(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::BOTTOM)) add_face_bottom(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::NORTH)) add_face_north(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::SOUTH)) add_face_south(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::EAST)) add_face_east(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::WEST)) add_face_west(chunk, wx, wy, wz, block_type, vert_map);
+                        const float block_size = static_cast<float>(step);
+                        if (should_render_block_face_lod(chunk, lx, ly, lz, step, BlockFace::TOP)) add_face_top(chunk, wx, wy, wz, block_type, vert_map, block_size);
+                        if (should_render_block_face_lod(chunk, lx, ly, lz, step, BlockFace::BOTTOM)) add_face_bottom(chunk, wx, wy, wz, block_type, vert_map, block_size);
+                        if (should_render_block_face_lod(chunk, lx, ly, lz, step, BlockFace::NORTH)) add_face_north(chunk, wx, wy, wz, block_type, vert_map, block_size);
+                        if (should_render_block_face_lod(chunk, lx, ly, lz, step, BlockFace::SOUTH)) add_face_south(chunk, wx, wy, wz, block_type, vert_map, block_size);
+                        if (should_render_block_face_lod(chunk, lx, ly, lz, step, BlockFace::EAST)) add_face_east(chunk, wx, wy, wz, block_type, vert_map, block_size);
+                        if (should_render_block_face_lod(chunk, lx, ly, lz, step, BlockFace::WEST)) add_face_west(chunk, wx, wy, wz, block_type, vert_map, block_size);
                     }
                 }
             }
@@ -515,14 +578,14 @@ namespace Craftbuild {
             return it->second;
         }
 
-        void add_face_top(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
+        void add_face_top(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map, float block_size = 1.0f) {
             float tex_id = Block::get_texture_index(block_type);
             glm::vec3 color = (block_type == BlockType::GRASS || block_type == BlockType::LEAVES) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
 
-            Vertex v0 = { {x, y + 1, z + 1}, color, {0.0f, 1.0f}, tex_id };
-            Vertex v1 = { {x + 1, y + 1, z + 1}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v2 = { {x + 1, y + 1, z}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v3 = { {x, y + 1, z}, color, {0.0f, 0.0f}, tex_id };
+            Vertex v0 = { {x, y + block_size, z + block_size}, color, {0.0f, 1.0f}, tex_id };
+            Vertex v1 = { {x + block_size, y + block_size, z + block_size}, color, {1.0f, 1.0f}, tex_id };
+            Vertex v2 = { {x + block_size, y + block_size, z}, color, {1.0f, 0.0f}, tex_id };
+            Vertex v3 = { {x, y + block_size, z}, color, {0.0f, 0.0f}, tex_id };
 
             uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
             uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
@@ -532,14 +595,14 @@ namespace Craftbuild {
             chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
         }
 
-        void add_face_bottom(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
+        void add_face_bottom(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map, float block_size = 1.0f) {
             float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
             glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
 
             Vertex v0 = { {x, y, z}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x + 1, y, z}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x + 1, y, z + 1}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x, y, z + 1}, color, {0.0f, 1.0f}, tex_id };
+            Vertex v1 = { {x + block_size, y, z}, color, {1.0f, 0.0f}, tex_id };
+            Vertex v2 = { {x + block_size, y, z + block_size}, color, {1.0f, 1.0f}, tex_id };
+            Vertex v3 = { {x, y, z + block_size}, color, {0.0f, 1.0f}, tex_id };
 
             uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
             uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
@@ -549,14 +612,14 @@ namespace Craftbuild {
             chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
         }
 
-        void add_face_north(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
+        void add_face_north(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map, float block_size = 1.0f) {
             float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
             glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
 
-            Vertex v0 = { {x, y, z + 1}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x + 1, y, z + 1}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x + 1, y + 1, z + 1}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x, y + 1, z + 1}, color, {0.0f, 1.0f}, tex_id };
+            Vertex v0 = { {x, y, z + block_size}, color, {0.0f, 0.0f}, tex_id };
+            Vertex v1 = { {x + block_size, y, z + block_size}, color, {1.0f, 0.0f}, tex_id };
+            Vertex v2 = { {x + block_size, y + block_size, z + block_size}, color, {1.0f, 1.0f}, tex_id };
+            Vertex v3 = { {x, y + block_size, z + block_size}, color, {0.0f, 1.0f}, tex_id };
 
             uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
             uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
@@ -566,14 +629,14 @@ namespace Craftbuild {
             chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
         }
 
-        void add_face_south(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
+        void add_face_south(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map, float block_size = 1.0f) {
             float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
             glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
 
-            Vertex v0 = { {x + 1, y, z}, color, {0.0f, 0.0f}, tex_id };
+            Vertex v0 = { {x + block_size, y, z}, color, {0.0f, 0.0f}, tex_id };
             Vertex v1 = { {x, y, z}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x, y + 1, z}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x + 1, y + 1, z}, color, {0.0f, 1.0f}, tex_id };
+            Vertex v2 = { {x, y + block_size, z}, color, {1.0f, 1.0f}, tex_id };
+            Vertex v3 = { {x + block_size, y + block_size, z}, color, {0.0f, 1.0f}, tex_id };
 
             uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
             uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
@@ -583,14 +646,14 @@ namespace Craftbuild {
             chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
         }
 
-        void add_face_east(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
+        void add_face_east(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map, float block_size = 1.0f) {
             float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
             glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
 
-            Vertex v0 = { {x + 1, y, z + 1}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x + 1, y, z}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x + 1, y + 1, z}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x + 1, y + 1, z + 1}, color, {0.0f, 1.0f}, tex_id };
+            Vertex v0 = { {x + block_size, y, z + block_size}, color, {0.0f, 0.0f}, tex_id };
+            Vertex v1 = { {x + block_size, y, z}, color, {1.0f, 0.0f}, tex_id };
+            Vertex v2 = { {x + block_size, y + block_size, z}, color, {1.0f, 1.0f}, tex_id };
+            Vertex v3 = { {x + block_size, y + block_size, z + block_size}, color, {0.0f, 1.0f}, tex_id };
 
             uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
             uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
@@ -600,14 +663,14 @@ namespace Craftbuild {
             chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
         }
 
-        void add_face_west(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
+        void add_face_west(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map, float block_size = 1.0f) {
             float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
             glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
 
             Vertex v0 = { {x, y, z}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x, y, z + 1}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x, y + 1, z + 1}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x, y + 1, z}, color, {0.0f, 1.0f}, tex_id };
+            Vertex v1 = { {x, y, z + block_size}, color, {1.0f, 0.0f}, tex_id };
+            Vertex v2 = { {x, y + block_size, z + block_size}, color, {1.0f, 1.0f}, tex_id };
+            Vertex v3 = { {x, y + block_size, z}, color, {0.0f, 1.0f}, tex_id };
 
             uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
             uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
@@ -616,10 +679,6 @@ namespace Craftbuild {
 
             chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
         }
-
-        enum class BlockFace {
-            TOP, BOTTOM, NORTH, SOUTH, EAST, WEST
-        };
 
         bool should_render_block_face(const Chunk& chunk, int x, int y, int z, BlockFace face) {
             int nx = x, ny = y, nz = z;
@@ -646,6 +705,14 @@ namespace Craftbuild {
 
                 int current_chunk_x = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
                 int current_chunk_z = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
+                if (lod_needs_rebuild.load()) {
+                    generate_world_mesh();
+                    lod_needs_rebuild.store(false);
+                    last_chunk_x = current_chunk_x;
+                    last_chunk_z = current_chunk_z;
+                    continue;
+                }
+
                 if (current_chunk_x != last_chunk_x or current_chunk_z != last_chunk_z) {
                     generate_world_mesh();
                     last_chunk_x = current_chunk_x;
