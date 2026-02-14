@@ -15,6 +15,10 @@ namespace Craftbuild {
             if (overworld_load) {
                 std::cout << "\033[96m[Game]\033[36m Loading World...\n";
 
+				float file_version = 0.0f;
+                overworld_load.read(reinterpret_cast<char*>(&file_version), sizeof(file_version));
+                if (file_version != GAME_VERSION and enable_validation_layers) std::cout << "\033[93m[Game]\033[33m Save file version " << file_version << " does not match game version " << GAME_VERSION << "\n";
+
                 int seed = 0;
                 overworld_load.read(reinterpret_cast<char*>(&seed), sizeof(seed));
                 world.set_seed(seed);
@@ -134,6 +138,8 @@ namespace Craftbuild {
             std::ofstream overworld_save("Game/Craftbuild/Save/overworld.cbsave", std::ios::binary);
             overworld_save.clear();
 
+			overworld_save.write(reinterpret_cast<const char*>(&GAME_VERSION), sizeof(GAME_VERSION));
+
             const auto seed = world.get_seed();
             overworld_save.write(reinterpret_cast<const char*>(&seed), sizeof(seed));
 
@@ -230,7 +236,7 @@ namespace Craftbuild {
         inline void init_window() {
             glfwInit();
             glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-            window = glfwCreateWindow(WIDTH, HEIGHT, "Craftbuild indev 1.0", nullptr, nullptr);
+            window = glfwCreateWindow(WIDTH, HEIGHT, std::format("Craftbuild {} {}", GAME_STATE, GAME_VERSION).c_str(), nullptr, nullptr);
             glfwSetWindowUserPointer(window, this);
             glfwSetFramebufferSizeCallback(window, framebuffer_resize_callback);
         }

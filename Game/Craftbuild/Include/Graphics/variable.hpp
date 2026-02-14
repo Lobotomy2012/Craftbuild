@@ -3,6 +3,8 @@
 #include <core.hpp>
 
 namespace Craftbuild {
+	const float GAME_VERSION = 1.0f;
+    const char* GAME_STATE = "Indev";
     const uint32_t WIDTH = 1200;
     const uint32_t HEIGHT = 700;
     const int MAX_FRAMES_IN_FLIGHT = 2;
