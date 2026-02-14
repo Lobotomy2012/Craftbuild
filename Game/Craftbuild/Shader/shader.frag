@@ -12,7 +12,7 @@ layout(location = 0) out vec4 out_color;
 void main() {
     int tex_index = int(frag_tex_id + 0.5);
 
-    if (tex_index < 0 || tex_index > 11) {
+    if (tex_index < 0 || tex_index > 13) {
         out_color = vec4(1.0, 0.0, 1.0, 1.0);
         return;
     }

@@ -364,3 +364,6 @@ FodyWeavers.xsd
 
 # Resource
 Resource/
+
+# cache
+Game/Craftbuild/Shader/Cache/
