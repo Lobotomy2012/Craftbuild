@@ -39,7 +39,6 @@ namespace Craftbuild {
         BlockType blocks[CHUNK_SIZE][WORLD_HEIGHT][CHUNK_SIZE]; // 16x383x16 blocks
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
-        LODLevel lod_level;
 
         void generate(int chunk_x, int chunk_z) {
             x = chunk_x;

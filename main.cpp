@@ -1,5 +1,5 @@
 #include <core.hpp>
-#include <Graphics/Graphics.hpp>
+#include <Graphics/class.hpp>
 
 int main() {
 #ifdef _DEBUG
