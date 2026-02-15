@@ -35,16 +35,26 @@ namespace Craftbuild {
     };
 
     struct Chunk {
+        static constexpr uint8_t LOD_LEVELS = 4;
+
         int x, z;
         BlockType blocks[CHUNK_SIZE][WORLD_HEIGHT][CHUNK_SIZE]; // 16x383x16 blocks
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
+        std::array<std::vector<Vertex>, LOD_LEVELS> lod_vertices;
+        std::array<std::vector<uint32_t>, LOD_LEVELS> lod_indices;
+        std::array<bool, LOD_LEVELS> lod_ready = { false, false, false, false };
 
         void generate(int chunk_x, int chunk_z) {
             x = chunk_x;
             z = chunk_z;
             vertices.clear();
             indices.clear();
+            for (uint8_t lod = 0; lod < LOD_LEVELS; ++lod) {
+                lod_vertices[lod].clear();
+                lod_indices[lod].clear();
+                lod_ready[lod] = false;
+            }
 
             for (int x = 0; x < CHUNK_SIZE; x++) {
                 for (int y = 0; y < WORLD_HEIGHT; y++) {
@@ -60,6 +70,13 @@ namespace Craftbuild {
             indices.clear();
             vertices.shrink_to_fit();
             indices.shrink_to_fit();
+            for (uint8_t lod = 0; lod < LOD_LEVELS; ++lod) {
+                lod_vertices[lod].clear();
+                lod_indices[lod].clear();
+                lod_vertices[lod].shrink_to_fit();
+                lod_indices[lod].shrink_to_fit();
+                lod_ready[lod] = false;
+            }
         }
 
         friend std::ostream& operator<<(std::ostream& os, const Chunk& other) {
@@ -89,6 +106,11 @@ namespace Craftbuild {
                 other.z = cz;
                 other.vertices.clear();
                 other.indices.clear();
+                for (uint8_t lod = 0; lod < LOD_LEVELS; ++lod) {
+                    other.lod_vertices[lod].clear();
+                    other.lod_indices[lod].clear();
+                    other.lod_ready[lod] = false;
+                }
             }
             return is;
         }
