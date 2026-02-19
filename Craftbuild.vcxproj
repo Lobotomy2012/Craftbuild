@@ -135,16 +135,21 @@
   <ItemGroup>
     <ClInclude Include="Game\Craftbuild\Include\core.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Graphics\function.hpp" />
-    <ClInclude Include="Game\Craftbuild\Include\Graphics\class.hpp" />
-    <ClInclude Include="Game\Craftbuild\Include\Graphics\struct.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Class\Main.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\QueueFamilyIndices.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\UniformBufferObject.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\SwapChainSupportDetails.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\Vertex.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Graphics\variable.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Player\enum.hpp" />
-    <ClInclude Include="Game\Craftbuild\Include\Player\class.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\Player\Class\Player.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Player\variable.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\World\enum.hpp" />
-    <ClInclude Include="Game\Craftbuild\Include\World\struct.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\World\Struct\Block.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\World\Struct\Chunk.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\World\variable.hpp" />
-    <ClInclude Include="Game\Craftbuild\Include\World\class.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\World\Class\Frustum.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\World\Class\World.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

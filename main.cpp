@@ -1,5 +1,5 @@
 #include <core.hpp>
-#include <Graphics/class.hpp>
+#include <Graphics/Class/Main.hpp>
 
 int main() {
 #ifdef _DEBUG
@@ -8,7 +8,7 @@ int main() {
 #endif 
 
     try {
-        Craftbuild::CraftbuildGraphics();
+        Craftbuild::CraftbuildMain();
     }
     catch (const std::exception& e) {
         std::cerr << "\033[95m[Fatal]\033[35m " << e.what() << "\033[0m\n";

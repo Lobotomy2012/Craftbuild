@@ -16,6 +16,15 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+
+#define NOMINMAX
+#include <windows.h>
+#undef NEAR
+#undef FAR
+#undef ERROR
+
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
@@ -31,7 +40,6 @@
 #include <set>
 #include <unordered_map>
 #include <functional>
-#include <cmath>
 #include <random>
 #include <thread>
 #include <mutex>

@@ -1,10 +1,10 @@
 #pragma once
 
 #include <core.hpp>
-#include <Graphics/variable.hpp>
+#include <World/Class/World.hpp>
 #include <Player/enum.hpp>
-#include <World/class.hpp>
 #include <Player/variable.hpp>
+#include <Graphics/variable.hpp>
 #include <Graphics/function.hpp>
 
 namespace Craftbuild {
@@ -38,53 +38,66 @@ namespace Craftbuild {
 
         }
 
-        bool raycast_block(const std::unordered_map<int64_t, Chunk>& chunk_map, glm::ivec3& out_block, glm::ivec3& out_adjacent, float max_distance = 8.0f, float step = 0.1f) const {
+        bool raycast_block(const std::unordered_map<int64_t, Chunk>& chunk_map, glm::ivec3& out_block, glm::ivec3& out_adjacent, float max_distance = 8.0f) const {
             glm::vec3 origin = pos;
             glm::vec3 dir = glm::normalize(camera_front);
 
-            glm::ivec3 last_block = glm::ivec3(glm::floor(origin));
+            glm::ivec3 voxel = glm::floor(origin);
 
-            for (float t = 0.0f; t <= max_distance; t += step) {
-                glm::vec3 p = origin + dir * t;
-                int bx = static_cast<int>(std::floor(p.x));
-                int by = static_cast<int>(std::floor(p.y));
-                int bz = static_cast<int>(std::floor(p.z));
+            glm::ivec3 step(
+                (dir.x > 0) ? 1 : -1,
+                (dir.y > 0) ? 1 : -1,
+                (dir.z > 0) ? 1 : -1
+            );
 
-                if (by < 0 or by >= WORLD_HEIGHT) continue;
+            glm::vec3 next_boundary = glm::vec3(voxel) +
+                glm::vec3((dir.x > 0) ? 1 : 0,
+                    (dir.y > 0) ? 1 : 0,
+                    (dir.z > 0) ? 1 : 0);
 
-                glm::ivec3 current_block(bx, by, bz);
-                if (current_block == last_block) continue;
-                last_block = current_block;
+            glm::vec3 tMax = (next_boundary - origin) / dir;
+            glm::vec3 tDelta = glm::abs(1.0f / dir);
 
-                int chunk_x = static_cast<int>(std::floor(bx / 16.0f));
-                int chunk_z = static_cast<int>(std::floor(bz / 16.0f));
-                int local_x = ((bx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-                int local_z = ((bz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+            float dist = 0.0f;
+            glm::ivec3 prev_voxel = voxel;
 
-                auto it = chunk_map.find(make_key(chunk_x, chunk_z));
-                if (it == chunk_map.end()) continue;
+            while (dist <= max_distance) {
+                if (voxel.y >= 0 and voxel.y < WORLD_HEIGHT) {
 
-                BlockType b = it->second.blocks[local_x][by][local_z];
-                if (b != BlockType::AIR && b != BlockType::WATER) {
-                    out_block = current_block;
+                    int chunk_x = (voxel.x >= 0) ? voxel.x / CHUNK_SIZE : (voxel.x - 15) / CHUNK_SIZE;
+                    int chunk_z = (voxel.z >= 0) ? voxel.z / CHUNK_SIZE : (voxel.z - 15) / CHUNK_SIZE;
 
-                    glm::vec3 prev_p = origin + dir * std::max(0.0f, t - step);
-                    int pbx = static_cast<int>(std::floor(prev_p.x));
-                    int pby = static_cast<int>(std::floor(prev_p.y));
-                    int pbz = static_cast<int>(std::floor(prev_p.z));
-                    glm::ivec3 prev_block(pbx, pby, pbz);
-                    glm::ivec3 normal = out_block - prev_block;
+                    int local_x = (voxel.x % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
+                    int local_z = (voxel.z % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
 
-                    if (normal == glm::ivec3(0)) {
-                        glm::vec3 local = p - (glm::vec3(bx, by, bz) + glm::vec3(0.5f));
-                        glm::vec3 abs_local = glm::abs(local);
-                        if (abs_local.x >= abs_local.y && abs_local.x >= abs_local.z) normal = glm::ivec3((local.x > 0) ? 1 : -1, 0, 0);
-                        else if (abs_local.y >= abs_local.x && abs_local.y >= abs_local.z) normal = glm::ivec3(0, (local.y > 0) ? 1 : -1, 0);
-                        else normal = glm::ivec3(0, 0, (local.z > 0) ? 1 : -1);
+                    auto it = chunk_map.find(make_key(chunk_x, chunk_z));
+                    if (it != chunk_map.end()) {
+                        BlockType b = it->second.blocks[local_x][voxel.y][local_z];
+
+                        if (b != BlockType::AIR and b != BlockType::WATER) {
+                            out_block = voxel;
+                            out_adjacent = prev_voxel;
+                            return true;
+                        }
                     }
+                }
 
-                    out_adjacent = out_block + normal;
-                    return true;
+                prev_voxel = voxel;
+
+                if (tMax.x < tMax.y and tMax.x < tMax.z) {
+                    voxel.x += step.x;
+                    dist = tMax.x;
+                    tMax.x += tDelta.x;
+                }
+                else if (tMax.y < tMax.z) {
+                    voxel.y += step.y;
+                    dist = tMax.y;
+                    tMax.y += tDelta.y;
+                }
+                else {
+                    voxel.z += step.z;
+                    dist = tMax.z;
+                    tMax.z += tDelta.z;
                 }
             }
 
@@ -189,21 +202,23 @@ namespace Craftbuild {
             if (keys[GLFW_KEY_F3] and keys[GLFW_KEY_F4]) {
                 if (!gamemode_toggled) {
                     gamemode = (Gamemode)(((uint8_t)gamemode + 1) % 4);
-                    std::cout << "\033[96m[Game]\033[36m Changed gamemode to " << (int)gamemode << "\n";
+                    log(LogLevel::INFO, std::format("Changed gamemode to {}", (int)gamemode).c_str());
                     can_fly = false;
                     gamemode_toggled = true;
                 }
+                f3_toggled = false;
             }
             else if (keys[GLFW_KEY_F3]) {
-                if (!f3_toggled and show_f3_screen and enable_validation_layers) {
-                    std::cout << "\033[96m[Game]\033[36m Player position: (" << pos.x << ", " << pos.y << ", " << pos.z << ")\n";
-                    std::cout << "\033[96m[Game]\033[36m FPS: " << 1.0f / delta_time << "\n";
-                    f3_toggled = true;
-                }
-                show_f3_screen = !show_f3_screen;
+                if (!f3_toggled) f3_toggled = true;
                 gamemode_toggled = false;
             }
             else {
+                if (f3_toggled) {
+                    show_f3_screen = !show_f3_screen;
+                    log(LogLevel::INFO, std::format("Player position: ({}, {}, {})", pos.x, pos.y, pos.z).c_str());
+                    log(LogLevel::INFO, std::format("FPS: {}", 1.0f / delta_time).c_str());
+                    log(LogLevel::INFO, std::format("Gamemode: {}", (int)gamemode).c_str());
+                }
                 f3_toggled = false;
                 gamemode_toggled = false;
             }

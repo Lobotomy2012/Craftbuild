@@ -3,20 +3,6 @@
 #include <core.hpp>
 
 namespace Craftbuild {
-    struct QueueFamilyIndices {
-        std::optional<uint32_t> graphics_family;
-        std::optional<uint32_t> present_family;
-        bool is_complete() {
-            return graphics_family.has_value() and present_family.has_value();
-        }
-    };
-
-    struct SwapChainSupportDetails {
-        VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> present_modes;
-    };
-
     struct Vertex {
         glm::vec3 pos;
         glm::vec3 color;
@@ -67,13 +53,5 @@ namespace std {
             size_t h4 = hash<float>()(vertex.tex_id);
             return ((h1 ^ (h2 << 1)) >> 1) ^ ((h3 ^ (h4 << 1)) >> 1);
         }
-    };
-}
-
-namespace Craftbuild {
-    struct UniformBufferObject {
-        alignas(16) glm::mat4 model;
-        alignas(16) glm::mat4 view;
-        alignas(16) glm::mat4 proj;
     };
 }

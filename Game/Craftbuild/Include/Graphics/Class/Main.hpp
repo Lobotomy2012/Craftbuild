@@ -1,23 +1,27 @@
 #pragma once
 
 #include <core.hpp>
-#include <World/class.hpp>
-#include <Player/class.hpp>
+#include <World/Class/World.hpp>
+#include <Player/Class/Player.hpp>
 #include <Graphics/variable.hpp>
-#include <Graphics/struct.hpp>
 #include <Graphics/function.hpp>
+#include <Graphics/Struct/QueueFamilyIndices.hpp>
+#include <Graphics/Struct/SwapChainSupportDetails.hpp>
+#include <Graphics/Struct/UniformBufferObject.hpp>
+#include <Graphics/Struct/Vertex.hpp>
 
 namespace Craftbuild {
-    class CraftbuildGraphics {
+    class CraftbuildMain {
     public:
-        CraftbuildGraphics() {
+        CraftbuildMain() {
             std::ifstream overworld_load("Game/Craftbuild/Save/overworld.cbsave");
             if (overworld_load) {
-                std::cout << "\033[96m[Game]\033[36m Loading World...\n";
+				log(LogLevel::INFO, "Loading World...");
 
 				float file_version = 0.0f;
                 overworld_load.read(reinterpret_cast<char*>(&file_version), sizeof(file_version));
-                if (file_version != GAME_VERSION and enable_validation_layers) std::cout << "\033[93m[Game]\033[33m Save file version " << file_version << " does not match game version " << GAME_VERSION << "\n";
+                if (file_version != GAME_VERSION)
+                    log(LogLevel::WARNING, std::format("Save file version {} does not match game version {}", file_version, GAME_VERSION).c_str());
 
                 int seed = 0;
                 overworld_load.read(reinterpret_cast<char*>(&seed), sizeof(seed));
@@ -30,13 +34,13 @@ namespace Craftbuild {
                 for (size_t _ = 0; _ < chunk_count; ++_) {
                     int64_t key;
                     if (!overworld_load.read(reinterpret_cast<char*>(&key), sizeof(key))) {
-                        std::cout << "\033[91m[Game]\033[31m Failed to load chunk key\n";
+						log(LogLevel::ERROR, "Failed to read chunk key");
                         success = false;
                         break;
                     }
                     Chunk chunk;
                     if (!(overworld_load >> chunk)) {
-                        std::cout << "\033[91m[Game]\033[31m Failed to load chunk\n";
+                        log(LogLevel::ERROR, "Failed to read chunk");
                         success = false;
                         break;
                     }
@@ -45,7 +49,7 @@ namespace Craftbuild {
 
                 if (success) {
                     if (!(overworld_load >> main_player)) {
-                        std::cout << "\033[91m[Game]\033[31m Failed to load main player\n";
+                        log(LogLevel::ERROR, "Failed to read main player");
                         success = false;
                     }
                 }
@@ -61,21 +65,20 @@ namespace Craftbuild {
                 std::mt19937 gen(rd());
                 std::uniform_int_distribution<> dist(1, 1'000'000'000);
                 const int seed = dist(gen);
-                std::cout << "\033[96m[Game]\033[36m Seed set to " << seed << "\n";
+                log(LogLevel::INFO, std::format("Seed set to {}", seed).c_str());
                 world.set_seed(seed);
             }
 
-            std::cout << "\033[96m[Game]\033[36m Generating World...\n";
+            log(LogLevel::INFO, "Generating World...");
             generate_world_mesh();
-
-            std::cout << "\033[96m[Game]\033[36m Done! Have fun\n";
+            log(LogLevel::INFO, "Done! Have fun");
 
             init_window();
             init_vulkan();
             init_input();
             main_loop();
         }
-        ~CraftbuildGraphics() {
+        ~CraftbuildMain() {
             vkDeviceWaitIdle(device);
 
             cleanup_swap_chain();
@@ -126,7 +129,7 @@ namespace Craftbuild {
             vkDestroyCommandPool(device, command_pool, nullptr);
             vkDestroyDevice(device, nullptr);
 
-            if (enable_validation_layers) destroy_debug_utils_messenger_ext(instance, debug_messenger, nullptr);
+            if constexpr (enable_validation_layers) destroy_debug_utils_messenger_ext(instance, debug_messenger, nullptr);
 
             vkDestroySurfaceKHR(instance, surface, nullptr);
             vkDestroyInstance(instance, nullptr);
@@ -134,7 +137,7 @@ namespace Craftbuild {
             glfwDestroyWindow(window);
             glfwTerminate();
 
-			std::cout << "\033[96m[Game]\033[36m Saving World...\n";
+            log(LogLevel::INFO, "Saving World...");
             std::ofstream overworld_save("Game/Craftbuild/Save/overworld.cbsave", std::ios::binary);
             overworld_save.clear();
 
@@ -228,10 +231,14 @@ namespace Craftbuild {
         VkImageView texture_atlas_view = nullptr;
 
         std::mutex mesh_mutex;
+        std::atomic<bool> running = true;
         std::atomic<bool> mesh_ready = false;
         std::atomic<bool> generating_mesh = false;
+        std::atomic<bool> should_regenerate_world = false;
         std::vector<Vertex> pending_vertices;
         std::vector<uint32_t> pending_indices;
+
+        int render_distance = 16;
 
         inline void init_window() {
             glfwInit();
@@ -242,7 +249,8 @@ namespace Craftbuild {
         }
 
         static inline void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
-            auto app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
+            if (height == 0) height = 1;
+            auto app = reinterpret_cast<CraftbuildMain*>(glfwGetWindowUserPointer(window));
             app->framebuffer_resized = true;
         }
 
@@ -277,7 +285,7 @@ namespace Craftbuild {
 
         static inline void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
             if (action != GLFW_PRESS) return;
-            auto app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
+            auto app = reinterpret_cast<CraftbuildMain*>(glfwGetWindowUserPointer(window));
 
             if (app->main_player.gamemode == Gamemode::Spectator or app->main_player.gamemode == Gamemode::Adventure) return;
 
@@ -289,8 +297,8 @@ namespace Craftbuild {
                 int by = wpos.y;
                 int bz = wpos.z;
                 if (by < 0 or by >= WORLD_HEIGHT) return;
-                int chunk_x = static_cast<int>(std::floor(bx / 16.0f));
-                int chunk_z = static_cast<int>(std::floor(bz / 16.0f));
+                int chunk_x = static_cast<int>(std::floor(bx / CHUNK_SIZE));
+                int chunk_z = static_cast<int>(std::floor(bz / CHUNK_SIZE));
                 int local_x = ((bx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
                 int local_z = ((bz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
                 auto it = app->chunk_map.find(make_key(chunk_x, chunk_z));
@@ -306,16 +314,16 @@ namespace Craftbuild {
                 set_block_at_world(placeBlock, BlockType::DIRT);
             }
 
-            app->generate_world_mesh();
+            app->should_regenerate_world = true;
         }
 
         static inline void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-            CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
+            CraftbuildMain* app = reinterpret_cast<CraftbuildMain*>(glfwGetWindowUserPointer(window));
             app->main_player.scroll_callback(xoffset, yoffset);
         }
 
         static inline void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-            CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
+            CraftbuildMain* app = reinterpret_cast<CraftbuildMain*>(glfwGetWindowUserPointer(window));
             if (action == GLFW_PRESS) {
                 app->keys[key] = true;
             }
@@ -325,7 +333,7 @@ namespace Craftbuild {
         }
 
         static void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
-            CraftbuildGraphics* app = reinterpret_cast<CraftbuildGraphics*>(glfwGetWindowUserPointer(window));
+            CraftbuildMain* app = reinterpret_cast<CraftbuildMain*>(glfwGetWindowUserPointer(window));
             if (app->main_player.first_mouse) {
                 app->main_player.last_x = xpos;
                 app->main_player.last_y = ypos;
@@ -367,12 +375,15 @@ namespace Craftbuild {
 
             int player_chunk_x = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
             int player_chunk_z = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
-            constexpr int render_distance = 16;
+
+			auto render_distance_sq = render_distance * render_distance;
 
             std::unordered_set<int64_t> desired_keys;
             desired_keys.reserve((render_distance * 2 + 1) * (render_distance * 2 + 1));
             for (int dx = -render_distance; dx <= render_distance; ++dx) {
                 for (int dz = -render_distance; dz <= render_distance; ++dz) {
+                    if (dx * dx + dz * dz > render_distance_sq) continue;
+
                     int cx = player_chunk_x + dx;
                     int cz = player_chunk_z + dz;
                     int64_t key = make_key(cx, cz);
@@ -439,13 +450,14 @@ namespace Craftbuild {
             std::vector<Chunk*> chunks;
             chunks.reserve(chunk_map.size());
             for (auto& [k, c] : chunk_map) chunks.push_back(&c);
+
+            const int px = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
+            const int pz = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
             std::sort(chunks.begin(), chunks.end(), [&](Chunk* a, Chunk* b) {
                 int ax = a->x, az = a->z;
                 int bx = b->x, bz = b->z;
-                int px = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
-                int pz = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
                 return (std::abs(ax - px) + std::abs(az - pz)) < (std::abs(bx - px) + std::abs(bz - pz));
-                });
+            });
 
             for (const auto* chunk_ptr : chunks) {
                 const Chunk& chunk = *chunk_ptr;
@@ -463,13 +475,7 @@ namespace Craftbuild {
             pending_indices = std::move(combined_indices);
             mesh_ready.store(true);
 
-            if (enable_validation_layers) {
-                std::cout << "\033[90m[Verbose] Generated mesh with "
-                    << index_buffer.first << " vertices, "
-                    << index_buffer.first << " indices, "
-                    << total_generated << " chunks, "
-                    << chunk_map.size() << " total loaded chunks\n";
-            }
+		    log(LogLevel::VERBOSE, std::format("Generated mesh with {} vertices, {} indices, {} chunks, {} total loaded chunks", vertex_buffer.first, index_buffer.first, total_generated, chunk_map.size()).c_str());
 
             generating_mesh.store(false);
         }
@@ -480,12 +486,13 @@ namespace Craftbuild {
             float oz = chunk.z * 16.0f;
 
             std::unordered_map<Vertex, uint32_t> vert_map;
+            vert_map.reserve(CHUNK_SIZE * CHUNK_SIZE * 8);
 
             for (int lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (int ly = 0; ly < WORLD_HEIGHT; ly++) {
                     for (int lz = 0; lz < CHUNK_SIZE; lz++) {
                         BlockType block_type = chunk.blocks[lx][ly][lz];
-                        if (block_type == BlockType::AIR || block_type == BlockType::WATER) {
+                        if (block_type == BlockType::AIR or block_type == BlockType::WATER) {
                             continue;
                         }
 
@@ -517,7 +524,7 @@ namespace Craftbuild {
 
         void add_face_top(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
             float tex_id = Block::get_texture_index(block_type);
-            glm::vec3 color = (block_type == BlockType::GRASS || block_type == BlockType::LEAVES) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
+            glm::vec3 color = (block_type == BlockType::GRASS or block_type == BlockType::LEAVES) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
 
             Vertex v0 = { {x, y + 1, z + 1}, color, {0.0f, 1.0f}, tex_id };
             Vertex v1 = { {x + 1, y + 1, z + 1}, color, {1.0f, 1.0f}, tex_id };
@@ -639,24 +646,25 @@ namespace Craftbuild {
         }
 
         void regenerate_world() {
-            while (!glfwWindowShouldClose(window)) {
+            while (running) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(16));
                 static int last_chunk_x = INT_MAX;
                 static int last_chunk_z = INT_MAX;
 
                 int current_chunk_x = static_cast<int>(std::floor(main_player.pos.x / 16.0f));
                 int current_chunk_z = static_cast<int>(std::floor(main_player.pos.z / 16.0f));
-                if (current_chunk_x != last_chunk_x or current_chunk_z != last_chunk_z) {
+                if (current_chunk_x != last_chunk_x or current_chunk_z != last_chunk_z or should_regenerate_world) {
                     generate_world_mesh();
                     last_chunk_x = current_chunk_x;
                     last_chunk_z = current_chunk_z;
+                    should_regenerate_world = false;
                 }
             }
         }
 
         void update_tick() {
             float accumulator = 0.0f;
-            while (!glfwWindowShouldClose(window)) {
+            while (running) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
                 // delta time
@@ -674,13 +682,11 @@ namespace Craftbuild {
         }
 
         void main_loop() {
-            std::thread mesh_thread(&CraftbuildGraphics::regenerate_world, this);
-            std::thread tick_thread(&CraftbuildGraphics::update_tick, this);
+            std::thread mesh_thread(&CraftbuildMain::regenerate_world, this);
+            std::thread tick_thread(&CraftbuildMain::update_tick, this);
 
             create_buffers();
-
-            glfwSwapInterval(1);
-            while (!glfwWindowShouldClose(window)) {
+            while (running) {
                 glfwPollEvents();
 
                 // delta time
@@ -693,6 +699,7 @@ namespace Craftbuild {
                 }
 
                 draw_frame();
+                running = !glfwWindowShouldClose(window);
             }
 
             if (mesh_thread.joinable()) mesh_thread.join();
@@ -759,7 +766,7 @@ namespace Craftbuild {
             create_info.ppEnabledExtensionNames = extensions.data();
 
             VkDebugUtilsMessengerCreateInfoEXT debug_create_info{};
-            if (enable_validation_layers) {
+            if constexpr (enable_validation_layers) {
                 create_info.enabledLayerCount = static_cast<uint32_t>(validation_layers.size());
                 create_info.ppEnabledLayerNames = validation_layers.data();
 
@@ -786,7 +793,7 @@ namespace Craftbuild {
         }
 
         inline void setup_debug_messenger() {
-            if (!enable_validation_layers) return;
+            if constexpr (!enable_validation_layers) return;
 
             VkDebugUtilsMessengerCreateInfoEXT create_info;
             populate_debug_messenger_create_info(create_info);
@@ -872,7 +879,7 @@ namespace Craftbuild {
             create_info.enabledExtensionCount = static_cast<uint32_t>(device_extensions.size());
             create_info.ppEnabledExtensionNames = device_extensions.data();
 
-            if (enable_validation_layers) {
+            if constexpr (enable_validation_layers) {
                 create_info.enabledLayerCount = static_cast<uint32_t>(validation_layers.size());
                 create_info.ppEnabledLayerNames = validation_layers.data();
             }
@@ -1844,7 +1851,7 @@ namespace Craftbuild {
             // Camera view matrix
             ubo.view = glm::lookAt(main_player.pos, main_player.pos + main_player.camera_front, main_player.camera_up);
             // Projection matrix
-            ubo.proj = glm::perspective(glm::radians(45.0f), swap_chain_extent.width / (float)swap_chain_extent.height, 0.1f, 500.0f);
+            ubo.proj = glm::perspective(glm::radians(FOV), swap_chain_extent.width / (float)swap_chain_extent.height, 0.1f, 500.0f);
             ubo.proj[1][1] *= -1;
             memcpy(uniform_buffers_mapped[current_image], &ubo, sizeof(ubo));
         }
@@ -1897,13 +1904,11 @@ namespace Craftbuild {
             if (all_vertices.empty() or all_indices.empty()) {
                 vertex_buffer = std::make_pair(0, nullptr);
                 index_buffer = std::make_pair(0, nullptr);
-                if (enable_validation_layers) {
-                    std::cout << "\033[93m[Warning]\033[33m No vertices or indices to render, skipping buffer update.\n";
-                }
+                log(LogLevel::WARNING, "No vertices or indices to render, skipping buffer update");
                 return;
             }
 
-            vkDeviceWaitIdle(device);
+			vkDeviceWaitIdle(device);
 
             vkDestroyBuffer(device, vertex_buffer.second, nullptr);
             vkFreeMemory(device, vertex_buffer_memory, nullptr);
@@ -2110,7 +2115,7 @@ namespace Craftbuild {
             const char** glfw_extensions;
             glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
             std::vector<const char*> extensions(glfw_extensions, glfw_extensions + glfw_extension_count);
-            if (enable_validation_layers) {
+            if constexpr (enable_validation_layers) {
                 extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
             }
             return extensions;
@@ -2150,19 +2155,16 @@ namespace Craftbuild {
         }
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_type, const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data, void* p_user_data) {
-            CraftbuildGraphics* console = reinterpret_cast<CraftbuildGraphics*>(p_user_data);
-            if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-                if (log_verbose) std::cout << "\033[90m[Verbose] validation layer: " << p_callback_data->pMessage << "\n";
-            }
-            else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-                std::cout << "\033[96m[Info] validation layer:\033[36m " << p_callback_data->pMessage << "\n";
-            }
-            else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-                std::cout << "\033[93m[Warning] validation layer:\033[33m " << p_callback_data->pMessage << "\n";
-            }
-            else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-                std::cout << "\033[91m[Error] validation layer:\033[31m " << p_callback_data->pMessage << "\n";
-            }
+            CraftbuildMain* console = reinterpret_cast<CraftbuildMain*>(p_user_data);
+            if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
+                if constexpr (log_verbose)
+                    std::cout << "\033[90m[Verbose][Validation Layer] " << p_callback_data->pMessage << "\n";
+            else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+                std::cout << "\033[96m[Info][Validation Layer] \033[36m " << p_callback_data->pMessage << "\n";
+            else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+                std::cout << "\033[93m[Warning][Validation Layer] \033[33m " << p_callback_data->pMessage << "\n";
+            else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+                std::cout << "\033[91m[Error][Validation Layer] \033[31m " << p_callback_data->pMessage << "\n";
             return VK_FALSE;
         }
     };

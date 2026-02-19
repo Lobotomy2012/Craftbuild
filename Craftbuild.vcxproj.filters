@@ -20,10 +20,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Game\Craftbuild\Include\Graphics\class.hpp">
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Class\Main.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Craftbuild\Include\World\class.hpp">
+    <ClInclude Include="Game\Craftbuild\Include\World\Class\Frustum.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Craftbuild\Include\World\enum.hpp">
@@ -35,10 +35,10 @@
     <ClInclude Include="Game\Craftbuild\Include\Graphics\variable.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Craftbuild\Include\Graphics\struct.hpp">
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\UniformBufferObject.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Craftbuild\Include\World\struct.hpp">
+    <ClInclude Include="Game\Craftbuild\Include\World\Struct\Chunk.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Craftbuild\Include\Graphics\function.hpp">
@@ -47,13 +47,28 @@
     <ClInclude Include="Game\Craftbuild\Include\World\variable.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Craftbuild\Include\Player\class.hpp">
+    <ClInclude Include="Game\Craftbuild\Include\Player\Class\Player.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Craftbuild\Include\Player\enum.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Craftbuild\Include\Player\variable.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\World\Class\World.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\QueueFamilyIndices.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\SwapChainSupportDetails.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\Vertex.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\World\Struct\Block.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

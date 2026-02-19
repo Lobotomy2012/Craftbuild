@@ -2,61 +2,12 @@
 
 #include <core.hpp>
 #include <World/enum.hpp>
-#include <World/struct.hpp>
 #include <World/variable.hpp>
+#include <World/Struct/Block.hpp>
+#include <World/Struct/Chunk.hpp>
+#include <World/Class/Frustum.hpp>
 
 namespace Craftbuild {
-    class Frustum {
-    private:
-        enum Plane {
-            LEFT = 0,
-            RIGHT,
-            BOTTOM,
-            TOP,
-            NEAR,
-            FAR,
-            COUNT
-        };
-
-        glm::vec4 planes[COUNT];
-
-    public:
-        void update(const glm::mat4& view_proj) {
-            glm::mat4 mat = glm::transpose(view_proj);
-
-            planes[LEFT] = mat[3] + mat[0];
-            planes[RIGHT] = mat[3] - mat[0];
-            planes[BOTTOM] = mat[3] + mat[1];
-            planes[TOP] = mat[3] - mat[1];
-            planes[NEAR] = mat[3] + mat[2];
-            planes[FAR] = mat[3] - mat[2];
-
-            for (int i = 0; i < COUNT; i++) {
-                float length = glm::length(glm::vec3(planes[i]));
-                planes[i] /= length;
-            }
-        }
-
-        bool is_box_visible(const glm::vec3& min, const glm::vec3& max) const {
-            for (int i = 0; i < COUNT; i++) {
-                glm::vec3 positive = min;
-                if (planes[i].x > 0) positive.x = max.x;
-                if (planes[i].y > 0) positive.y = max.y;
-                if (planes[i].z > 0) positive.z = max.z;
-
-                float distance = planes[i].x * positive.x +
-                    planes[i].y * positive.y +
-                    planes[i].z * positive.z +
-                    planes[i].w;
-
-                if (distance < 0) {
-                    return false;
-                }
-            }
-            return true;
-        }
-    };
-
     class World {
         class PerlinNoise {
             static double fade(double t) { return t * t * t * (t * (t * 6 - 15) + 10); }
@@ -64,7 +15,7 @@ namespace Craftbuild {
             static double grad(int hash, double x, double y, double z) {
                 int h = hash & 15;
                 double u = h < 8 ? x : y;
-                double v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
+                double v = h < 4 ? y : (h == 12 or h == 14 ? x : z);
                 return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
             }
 
@@ -114,108 +65,71 @@ namespace Craftbuild {
         PerlinNoise continentalness, erosion, peaks_valleys, weirdness, temperature, humidity, cave_noise, tree_noise;
         int seed;
 
-        double get_height(int x, int z) {
-            double cont = continentalness.octave_noise(x * 0.001, z * 0.001, 0, 5, 0.5, 2.0) * 2.0 - 1.0;
-            double ero = erosion.octave_noise(x * 0.002, z * 0.002, 0, 4, 0.6, 2.0) * 2.0 - 1.0;
-            double pv = peaks_valleys.octave_noise(x * 0.003, z * 0.003, 0, 3, 0.7, 2.0) * 2.0 - 1.0;
-            double w = weirdness.octave_noise(x * 0.004, z * 0.004, 0, 4, 0.5, 2.0) * 2.0 - 1.0;
+        double compute_density(int x, int y, int z) {
+            double cont = continentalness.octave_noise(x * 0.0008, 0, z * 0.0008, 5, 0.5) * 2.0 - 1.0;
+            double ero = erosion.octave_noise(x * 0.0015, 0, z * 0.0015, 4, 0.6) * 2.0 - 1.0;
+            double pv = peaks_valleys.octave_noise(x * 0.002, 0, z * 0.002, 4, 0.5) * 2.0 - 1.0;
+            double weird = weirdness.octave_noise(x * 0.0012, 0, z * 0.0012, 3, 0.5) * 2.0 - 1.0;
 
-            double base_height = 64.0 + cont * 80.0;
-            double mountain = std::max(0.0, pv * 1.5 + w * 0.5) * 120.0;
-            double eroded = ero * 40.0;
+            double terrain = cont * 1.2 - ero * 0.5 + pv * 0.8 + weird * 0.3;
 
-            return std::clamp(base_height + mountain - eroded, 0.0, 320.0);
+            // Vertical gradient
+            double vertical = (y - 80.0) / 80.0;
+
+            // Cave density
+            double cave = cave_noise.octave_noise(x * 0.03, y * 0.03, z * 0.03, 4, 0.5);
+            return terrain - vertical - cave * 0.7;
         }
 
         BiomeType get_biome(int x, int z) {
-            double temp = temperature.octave_noise(x * 0.0005, z * 0.0005, 0, 4, 0.5) * 2.0 - 1.0;
-            double humid = humidity.octave_noise(x * 0.0007, z * 0.0007, 0, 4, 0.5) * 2.0 - 1.0;
-            double height = get_height(x, z);
+            double cont = continentalness.octave_noise(x * 0.0008, 0, z * 0.0008, 5, 0.5) * 2.0 - 1.0;
+            double temp = temperature.octave_noise(x * 0.0005, 0, z * 0.0005, 4, 0.5) * 2.0 - 1.0;
+            double humid = humidity.octave_noise(x * 0.0007, 0, z * 0.0007, 4, 0.5) * 2.0 - 1.0;
 
-            if (height < 62) return BiomeType::OCEAN;
-            if (height < 65) return BiomeType::BEACH;
+            if (cont < -0.4) return BiomeType::OCEAN;
+            if (cont < -0.2) return BiomeType::BEACH;
 
-            if (temp < -0.4) return BiomeType::TAIGA;
+            if (temp < -0.5) return BiomeType::TAIGA;
+
             if (temp > 0.6) {
-                if (humid < -0.3) return BiomeType::DESERT;
+                if (humid < -0.2) return BiomeType::DESERT;
                 if (humid > 0.5) return BiomeType::JUNGLE;
                 return BiomeType::SAVANNA;
             }
-            if (humid > 0.6) return BiomeType::SWAMP;
-            if (height > 140) return BiomeType::MOUNTAINS;
 
-            double forest = tree_noise.octave_noise(x * 0.002, z * 0.002, 0, 3, 0.6);
-            if (forest > 0.4 && humid > 0.2) return BiomeType::FOREST;
+            if (humid > 0.6) return BiomeType::SWAMP;
 
             return BiomeType::PLAINS;
         }
 
-        bool should_generate_cave(int x, int y, int z) {
-            if (y < 10 || y > 240) return false;
-
-            // Cheese caves (big round holes)
-            double cheese = cave_noise.octave_noise(x * 0.03, y * 0.03, z * 0.03, 4, 0.5);
-            // Noodle caves (thin tunnels)
-            double noodle = cave_noise.octave_noise(x * 0.08, y * 0.08, z * 0.08, 3, 0.6);
-            // Spaghetti caves (winding tunnels)
-            double spaghetti = cave_noise.octave_noise(x * 0.05, y * 0.05, z * 0.05, 5, 0.4);
-
-            double density = 0.65 - (y / 256.0) * 0.3;
-            return (cheese > density * 1.2) || (noodle > density * 0.9) || (spaghetti > density * 1.0);
-        }
-
         void generate_terrain(Chunk& chunk) {
-            for (int lx = 0; lx < 16; ++lx) {
-                for (int lz = 0; lz < 16; ++lz) {
-                    int wx = chunk.x * 16 + lx;
-                    int wz = chunk.z * 16 + lz;
-                    double height = get_height(wx, wz);
-                    BiomeType biome = get_biome(wx, wz);
+            for (int lx = 0; lx < CHUNK_SIZE; ++lx) {
+                for (int lz = 0; lz < CHUNK_SIZE; ++lz) {
+                    int wx = chunk.x * CHUNK_SIZE + lx;
+                    int wz = chunk.z * CHUNK_SIZE + lz;
 
-                    for (int ly = 0; ly < 383; ++ly) {
-                        if (ly == 0) {
+                    for (int ly = 0; ly < WORLD_HEIGHT; ++ly) {
+                        int wy = ly;
+
+                        if (wy == 0) {
                             chunk.blocks[lx][ly][lz] = BlockType::BEDROCK;
+                            continue;
                         }
-                        else if (ly < height - 4) {
+                        else if (wy < 5) {
+                            chunk.blocks[lx][ly][lz] = BlockType::STONE;
+                            continue;
+                        }
+
+                        double density = compute_density(wx, wy, wz);
+
+                        if (density > 0.0) {
                             chunk.blocks[lx][ly][lz] = BlockType::STONE;
                         }
-                        else if (ly < height - 1) {
-                            chunk.blocks[lx][ly][lz] = BlockType::DIRT;
-                        }
-                        else if (ly < height) {
-                            switch (biome) {
-                            case BiomeType::DESERT: case BiomeType::BEACH:
-                                chunk.blocks[lx][ly][lz] = BlockType::SAND;
-                                break;
-                            case BiomeType::OCEAN:
-                                chunk.blocks[lx][ly][lz] = (ly < 62) ? BlockType::SAND : BlockType::GRAVEL;
-                                break;
-                            default:
-                                chunk.blocks[lx][ly][lz] = BlockType::GRASS;
-                            }
-                        }
-                        else if (ly <= 62) {
+                        else if (wy <= 62) {
                             chunk.blocks[lx][ly][lz] = BlockType::WATER;
                         }
                         else {
                             chunk.blocks[lx][ly][lz] = BlockType::AIR;
-                        }
-                    }
-                }
-            }
-        }
-
-        void generate_caves(Chunk& chunk) {
-            for (int lx = 0; lx < 16; ++lx) {
-                for (int ly = 0; ly < 383; ++ly) {
-                    for (int lz = 0; lz < 16; ++lz) {
-                        int wx = chunk.x * 16 + lx;
-                        int wz = chunk.z * 16 + lz;
-                        BlockType& block = chunk.blocks[lx][ly][lz];
-                        if (block != BlockType::AIR && block != BlockType::WATER && block != BlockType::BEDROCK) {
-                            if (should_generate_cave(wx, ly, wz)) {
-                                block = BlockType::AIR;
-                            }
                         }
                     }
                 }
@@ -227,10 +141,10 @@ namespace Craftbuild {
             std::uniform_int_distribution<> height_dist(5, 12);
             std::uniform_real_distribution<> rand(0.0, 1.0);
 
-            for (int lx = 0; lx < 16; ++lx) {
-                for (int lz = 0; lz < 16; ++lz) {
-                    int wx = chunk.x * 16 + lx;
-                    int wz = chunk.z * 16 + lz;
+            for (int lx = 0; lx < CHUNK_SIZE; ++lx) {
+                for (int lz = 0; lz < CHUNK_SIZE; ++lz) {
+                    int wx = chunk.x * CHUNK_SIZE + lx;
+                    int wz = chunk.z * CHUNK_SIZE + lz;
                     BiomeType biome = get_biome(wx, wz);
 
                     double density = 0.0;
@@ -244,20 +158,20 @@ namespace Craftbuild {
                     if (rand(rng) > density) continue;
 
                     int ground_y = -1;
-                    for (int ly = 382; ly >= 0; --ly) {
-                        if (chunk.blocks[lx][ly][lz] == BlockType::GRASS ||
-                            chunk.blocks[lx][ly][lz] == BlockType::DIRT ||
+                    for (int ly = WORLD_HEIGHT; ly >= 0; --ly) {
+                        if (chunk.blocks[lx][ly][lz] == BlockType::GRASS or
+                            chunk.blocks[lx][ly][lz] == BlockType::DIRT or
                             chunk.blocks[lx][ly][lz] == BlockType::SAND) {
                             ground_y = ly;
                             break;
                         }
                     }
-                    if (ground_y < 4 || ground_y > 200) continue;
+                    if (ground_y < 4 or ground_y > 200) continue;
 
                     int height = height_dist(rng);
                     for (int h = 1; h <= height; ++h) {
                         int ty = ground_y + h;
-                        if (ty >= 383) break;
+                        if (ty >= WORLD_HEIGHT) break;
                         chunk.blocks[lx][ty][lz] = BlockType::WOOD;
                     }
 
@@ -267,7 +181,7 @@ namespace Craftbuild {
                         for (int dz = -radius; dz <= radius; ++dz) {
                             for (int dy = -radius / 2; dy <= radius; ++dy) {
                                 int px = lx + dx, pz = lz + dz, py = leaf_y + dy;
-                                if (px < 0 || px >= 16 || pz < 0 || pz >= 16 || py < 0 || py >= 383) continue;
+                                if (px < 0 or px >= CHUNK_SIZE or pz < 0 or pz >= CHUNK_SIZE or py < 0 or py >= WORLD_HEIGHT) continue;
 
                                 double dist = std::sqrt(dx * dx + dy * dy * 0.7 + dz * dz);
                                 if (dist <= radius + rand(rng) * 0.6 - 0.3) {
@@ -291,25 +205,50 @@ namespace Craftbuild {
                     int ground_y = -1;
                     for (int ly = 382; ly >= 0; --ly) {
                         BlockType b = chunk.blocks[lx][ly][lz];
-                        if (b == BlockType::GRASS || b == BlockType::DIRT || b == BlockType::SAND) {
+                        if (b == BlockType::GRASS or b == BlockType::DIRT or b == BlockType::SAND) {
                             ground_y = ly;
                             break;
                         }
                     }
-                    if (ground_y < 0 || ground_y >= 382) continue;
+                    if (ground_y < 0 or ground_y >= 382) continue;
 
-                    if ((biome == BiomeType::TAIGA && rand(rng) < 0.7) ||
-                        (biome == BiomeType::MOUNTAINS && ground_y > 140 && rand(rng) < 0.9)) {
+                    if ((biome == BiomeType::TAIGA and rand(rng) < 0.7) or
+                        (biome == BiomeType::MOUNTAINS and ground_y > 140 and rand(rng) < 0.9)) {
                         if (chunk.blocks[lx][ground_y + 1][lz] == BlockType::AIR) {
                             chunk.blocks[lx][ground_y][lz] = BlockType::SNOW;
                         }
                     }
 
                     if (chunk.blocks[lx][ground_y + 1][lz] == BlockType::AIR) {
-                        if (biome == BiomeType::PLAINS || biome == BiomeType::FOREST) {
+                        if (biome == BiomeType::PLAINS or biome == BiomeType::FOREST) {
                             if (rand(rng) < 0.25) {
                                 chunk.blocks[lx][ground_y + 1][lz] = BlockType::GRASS_PLANT;
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        void build_surface(Chunk& chunk) {
+            for (int lx = 0; lx < CHUNK_SIZE; ++lx) {
+                for (int lz = 0; lz < CHUNK_SIZE; ++lz) {
+                    int depth = 0;
+
+                    for (int ly = WORLD_HEIGHT - 1; ly >= 0; --ly) {
+                        BlockType& b = chunk.blocks[lx][ly][lz];
+
+                        if (b == BlockType::AIR) {
+                            depth = 0;
+                        }
+                        else if (b == BlockType::STONE) {
+                            if (depth == 0 && ly > 62) {
+                                b = BlockType::GRASS;
+                            }
+                            else if (depth < 4) {
+                                b = BlockType::DIRT;
+                            }
+                            depth++;
                         }
                     }
                 }
@@ -325,15 +264,12 @@ namespace Craftbuild {
             temperature(seed + 4),
             humidity(seed + 5),
             cave_noise(seed + 6),
-            tree_noise(seed + 7) {
-        }
+            tree_noise(seed + 7) {}
 
         void generate_chunk(Chunk& chunk) {
             generate_terrain(chunk);
-            BiomeType biome = get_biome(chunk.x * CHUNK_SIZE + (CHUNK_SIZE / 2), chunk.z * CHUNK_SIZE + (CHUNK_SIZE / 2));
-            generate_caves(chunk);
+            build_surface(chunk);
             generate_trees(chunk);
-            decorate_surface(chunk, biome);
         }
 
         void set_seed(int seed) {
@@ -347,7 +283,7 @@ namespace Craftbuild {
             cave_noise = PerlinNoise(seed + 6);
             tree_noise = PerlinNoise(seed + 7);
         }
-        
+
         int get_seed() const {
             return seed;
         }
