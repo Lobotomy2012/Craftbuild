@@ -480,153 +480,219 @@ namespace Craftbuild {
             generating_mesh.store(false);
         }
 
-        void create_chunk_mesh(Chunk& chunk) {
-            // Pre-calculate chunk offset
-            float ox = chunk.x * 16.0f;
-            float oz = chunk.z * 16.0f;
 
-            std::unordered_map<Vertex, uint32_t> vert_map;
-            vert_map.reserve(CHUNK_SIZE * CHUNK_SIZE * 8);
-
-            for (int lx = 0; lx < CHUNK_SIZE; lx++) {
-                for (int ly = 0; ly < WORLD_HEIGHT; ly++) {
-                    for (int lz = 0; lz < CHUNK_SIZE; lz++) {
-                        BlockType block_type = chunk.blocks[lx][ly][lz];
-                        if (block_type == BlockType::AIR or block_type == BlockType::WATER) {
-                            continue;
-                        }
-
-                        float wx = ox + lx;
-                        float wy = ly;
-                        float wz = oz + lz;
-
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::TOP)) add_face_top(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::BOTTOM)) add_face_bottom(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::NORTH)) add_face_north(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::SOUTH)) add_face_south(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::EAST)) add_face_east(chunk, wx, wy, wz, block_type, vert_map);
-                        if (should_render_block_face(chunk, lx, ly, lz, BlockFace::WEST)) add_face_west(chunk, wx, wy, wz, block_type, vert_map);
-                    }
-                }
-            }
-        }
-
-        inline uint32_t get_vertex_index(Chunk& chunk, const Vertex& vertex, std::unordered_map<Vertex, uint32_t>& vert_map) {
-            auto it = vert_map.find(vertex);
-            if (it == vert_map.end()) {
-                uint32_t index = static_cast<uint32_t>(chunk.vertices.size());
-                chunk.vertices.push_back(vertex);
-                vert_map[vertex] = index;
-                return index;
-            }
-            return it->second;
-        }
-
-        void add_face_top(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
-            float tex_id = Block::get_texture_index(block_type);
-            glm::vec3 color = (block_type == BlockType::GRASS or block_type == BlockType::LEAVES) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
-
-            Vertex v0 = { {x, y + 1, z + 1}, color, {0.0f, 1.0f}, tex_id };
-            Vertex v1 = { {x + 1, y + 1, z + 1}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v2 = { {x + 1, y + 1, z}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v3 = { {x, y + 1, z}, color, {0.0f, 0.0f}, tex_id };
-
-            uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
-            uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
-            uint32_t i2 = get_vertex_index(chunk, v2, vert_map);
-            uint32_t i3 = get_vertex_index(chunk, v3, vert_map);
-
-            chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
-        }
-
-        void add_face_bottom(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
-            float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
-            glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
-
-            Vertex v0 = { {x, y, z}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x + 1, y, z}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x + 1, y, z + 1}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x, y, z + 1}, color, {0.0f, 1.0f}, tex_id };
-
-            uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
-            uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
-            uint32_t i2 = get_vertex_index(chunk, v2, vert_map);
-            uint32_t i3 = get_vertex_index(chunk, v3, vert_map);
-
-            chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
-        }
-
-        void add_face_north(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
-            float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
-            glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
-
-            Vertex v0 = { {x, y, z + 1}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x + 1, y, z + 1}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x + 1, y + 1, z + 1}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x, y + 1, z + 1}, color, {0.0f, 1.0f}, tex_id };
-
-            uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
-            uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
-            uint32_t i2 = get_vertex_index(chunk, v2, vert_map);
-            uint32_t i3 = get_vertex_index(chunk, v3, vert_map);
-
-            chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
-        }
-
-        void add_face_south(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
-            float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
-            glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
-
-            Vertex v0 = { {x + 1, y, z}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x, y, z}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x, y + 1, z}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x + 1, y + 1, z}, color, {0.0f, 1.0f}, tex_id };
-
-            uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
-            uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
-            uint32_t i2 = get_vertex_index(chunk, v2, vert_map);
-            uint32_t i3 = get_vertex_index(chunk, v3, vert_map);
-
-            chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
-        }
-
-        void add_face_east(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
-            float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
-            glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
-
-            Vertex v0 = { {x + 1, y, z + 1}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x + 1, y, z}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x + 1, y + 1, z}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x + 1, y + 1, z + 1}, color, {0.0f, 1.0f}, tex_id };
-
-            uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
-            uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
-            uint32_t i2 = get_vertex_index(chunk, v2, vert_map);
-            uint32_t i3 = get_vertex_index(chunk, v3, vert_map);
-
-            chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
-        }
-
-        void add_face_west(Chunk& chunk, float x, float y, float z, BlockType block_type, std::unordered_map<Vertex, uint32_t>& vert_map) {
-            float tex_id = Block::get_texture_index(block_type == BlockType::GRASS ? BlockType::DIRT : block_type);
-            glm::vec3 color = block_type == BlockType::LEAVES ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
-
-            Vertex v0 = { {x, y, z}, color, {0.0f, 0.0f}, tex_id };
-            Vertex v1 = { {x, y, z + 1}, color, {1.0f, 0.0f}, tex_id };
-            Vertex v2 = { {x, y + 1, z + 1}, color, {1.0f, 1.0f}, tex_id };
-            Vertex v3 = { {x, y + 1, z}, color, {0.0f, 1.0f}, tex_id };
-
-            uint32_t i0 = get_vertex_index(chunk, v0, vert_map);
-            uint32_t i1 = get_vertex_index(chunk, v1, vert_map);
-            uint32_t i2 = get_vertex_index(chunk, v2, vert_map);
-            uint32_t i3 = get_vertex_index(chunk, v3, vert_map);
-
-            chunk.indices.insert(chunk.indices.end(), { i0, i1, i2, i0, i2, i3 });
-        }
 
         enum class BlockFace {
             TOP, BOTTOM, NORTH, SOUTH, EAST, WEST
         };
+
+        bool is_meshing_solid(BlockType block_type) const {
+            return !(block_type == BlockType::AIR or block_type == BlockType::WATER);
+        }
+
+        bool is_face_occluder(BlockType block_type) const {
+            return block_type != BlockType::AIR and block_type != BlockType::WATER and block_type != BlockType::LEAVES;
+        }
+
+        void append_quad(Chunk& chunk, const Vertex& v0, const Vertex& v1, const Vertex& v2, const Vertex& v3) {
+            const uint32_t base = static_cast<uint32_t>(chunk.vertices.size());
+            chunk.vertices.push_back(v0);
+            chunk.vertices.push_back(v1);
+            chunk.vertices.push_back(v2);
+            chunk.vertices.push_back(v3);
+            chunk.indices.insert(chunk.indices.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
+        }
+
+        void add_greedy_face(Chunk& chunk, BlockFace face, float x0, float y0, float z0, float x1, float y1, float z1, BlockType block_type) {
+            const bool is_top = face == BlockFace::TOP;
+            const bool is_bottom = face == BlockFace::BOTTOM;
+            const float tex_id = Block::get_texture_index(is_top ? block_type : (is_bottom and block_type == BlockType::GRASS ? BlockType::DIRT : block_type));
+            const glm::vec3 color = (block_type == BlockType::GRASS or block_type == BlockType::LEAVES) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f);
+
+            const float u_scale = std::max(1.0f, std::abs(x1 - x0) + std::abs(z1 - z0));
+            const float v_scale = std::max(1.0f, std::abs(y1 - y0) + (is_top or is_bottom ? std::abs(z1 - z0) : std::abs(x1 - x0)));
+
+            if (face == BlockFace::TOP) {
+                append_quad(chunk,
+                    { {x0, y0, z1}, color, {0.0f, v_scale}, tex_id },
+                    { {x1, y0, z1}, color, {u_scale, v_scale}, tex_id },
+                    { {x1, y0, z0}, color, {u_scale, 0.0f}, tex_id },
+                    { {x0, y0, z0}, color, {0.0f, 0.0f}, tex_id });
+            }
+            else if (face == BlockFace::BOTTOM) {
+                append_quad(chunk,
+                    { {x0, y0, z0}, color, {0.0f, 0.0f}, tex_id },
+                    { {x1, y0, z0}, color, {u_scale, 0.0f}, tex_id },
+                    { {x1, y0, z1}, color, {u_scale, v_scale}, tex_id },
+                    { {x0, y0, z1}, color, {0.0f, v_scale}, tex_id });
+            }
+            else if (face == BlockFace::NORTH) {
+                append_quad(chunk,
+                    { {x0, y0, z0}, color, {0.0f, 0.0f}, tex_id },
+                    { {x1, y0, z0}, color, {u_scale, 0.0f}, tex_id },
+                    { {x1, y1, z0}, color, {u_scale, v_scale}, tex_id },
+                    { {x0, y1, z0}, color, {0.0f, v_scale}, tex_id });
+            }
+            else if (face == BlockFace::SOUTH) {
+                append_quad(chunk,
+                    { {x1, y0, z0}, color, {0.0f, 0.0f}, tex_id },
+                    { {x0, y0, z0}, color, {u_scale, 0.0f}, tex_id },
+                    { {x0, y1, z0}, color, {u_scale, v_scale}, tex_id },
+                    { {x1, y1, z0}, color, {0.0f, v_scale}, tex_id });
+            }
+            else if (face == BlockFace::EAST) {
+                append_quad(chunk,
+                    { {x0, y0, z1}, color, {0.0f, 0.0f}, tex_id },
+                    { {x0, y0, z0}, color, {u_scale, 0.0f}, tex_id },
+                    { {x0, y1, z0}, color, {u_scale, v_scale}, tex_id },
+                    { {x0, y1, z1}, color, {0.0f, v_scale}, tex_id });
+            }
+            else {
+                append_quad(chunk,
+                    { {x0, y0, z0}, color, {0.0f, 0.0f}, tex_id },
+                    { {x0, y0, z1}, color, {u_scale, 0.0f}, tex_id },
+                    { {x0, y1, z1}, color, {u_scale, v_scale}, tex_id },
+                    { {x0, y1, z0}, color, {0.0f, v_scale}, tex_id });
+            }
+        }
+
+        void create_chunk_mesh(Chunk& chunk) {
+            chunk.vertices.clear();
+            chunk.indices.clear();
+
+            const float ox = chunk.x * static_cast<float>(CHUNK_SIZE);
+            const float oz = chunk.z * static_cast<float>(CHUNK_SIZE);
+
+            struct MaskCell {
+                bool valid = false;
+                BlockType type = BlockType::AIR;
+            };
+
+            auto emit_merged_faces = [&](const std::vector<MaskCell>& mask, int width, int height, auto emit_face) {
+                std::vector<bool> used(static_cast<size_t>(width * height), false);
+                for (int j = 0; j < height; ++j) {
+                    for (int i = 0; i < width; ++i) {
+                        const size_t idx = static_cast<size_t>(j * width + i);
+                        if (used[idx] or !mask[idx].valid) continue;
+
+                        const BlockType block_type = mask[idx].type;
+                        int run_w = 1;
+                        while (i + run_w < width) {
+                            const size_t next_idx = static_cast<size_t>(j * width + (i + run_w));
+                            if (used[next_idx] or !mask[next_idx].valid or mask[next_idx].type != block_type) break;
+                            run_w++;
+                        }
+
+                        int run_h = 1;
+                        bool can_extend = true;
+                        while (j + run_h < height and can_extend) {
+                            for (int k = 0; k < run_w; ++k) {
+                                const size_t next_idx = static_cast<size_t>((j + run_h) * width + (i + k));
+                                if (used[next_idx] or !mask[next_idx].valid or mask[next_idx].type != block_type) {
+                                    can_extend = false;
+                                    break;
+                                }
+                            }
+                            if (can_extend) run_h++;
+                        }
+
+                        for (int yy = 0; yy < run_h; ++yy) {
+                            for (int xx = 0; xx < run_w; ++xx) {
+                                used[static_cast<size_t>((j + yy) * width + (i + xx))] = true;
+                            }
+                        }
+                        emit_face(i, j, run_w, run_h, block_type);
+                    }
+                }
+            };
+
+            std::vector<MaskCell> mask;
+
+            for (int y = 0; y < WORLD_HEIGHT; ++y) {
+                mask.assign(static_cast<size_t>(CHUNK_SIZE * CHUNK_SIZE), {});
+                for (int x = 0; x < CHUNK_SIZE; ++x) {
+                    for (int z = 0; z < CHUNK_SIZE; ++z) {
+                        BlockType block = chunk.blocks[x][y][z];
+                        if (!is_meshing_solid(block) or !should_render_block_face(chunk, x, y, z, BlockFace::TOP)) continue;
+                        mask[static_cast<size_t>(z * CHUNK_SIZE + x)] = { true, block };
+                    }
+                }
+                emit_merged_faces(mask, CHUNK_SIZE, CHUNK_SIZE, [&](int x, int z, int w, int h, BlockType type) {
+                    add_greedy_face(chunk, BlockFace::TOP, ox + x, y + 1.0f, oz + z, ox + x + w, y + 1.0f, oz + z + h, type);
+                    });
+            }
+
+            for (int y = 0; y < WORLD_HEIGHT; ++y) {
+                mask.assign(static_cast<size_t>(CHUNK_SIZE * CHUNK_SIZE), {});
+                for (int x = 0; x < CHUNK_SIZE; ++x) {
+                    for (int z = 0; z < CHUNK_SIZE; ++z) {
+                        BlockType block = chunk.blocks[x][y][z];
+                        if (!is_meshing_solid(block) or !should_render_block_face(chunk, x, y, z, BlockFace::BOTTOM)) continue;
+                        mask[static_cast<size_t>(z * CHUNK_SIZE + x)] = { true, block };
+                    }
+                }
+                emit_merged_faces(mask, CHUNK_SIZE, CHUNK_SIZE, [&](int x, int z, int w, int h, BlockType type) {
+                    add_greedy_face(chunk, BlockFace::BOTTOM, ox + x, y, oz + z, ox + x + w, y, oz + z + h, type);
+                    });
+            }
+
+            for (int z = 0; z < CHUNK_SIZE; ++z) {
+                mask.assign(static_cast<size_t>(CHUNK_SIZE * WORLD_HEIGHT), {});
+                for (int x = 0; x < CHUNK_SIZE; ++x) {
+                    for (int y = 0; y < WORLD_HEIGHT; ++y) {
+                        BlockType block = chunk.blocks[x][y][z];
+                        if (!is_meshing_solid(block) or !should_render_block_face(chunk, x, y, z, BlockFace::NORTH)) continue;
+                        mask[static_cast<size_t>(y * CHUNK_SIZE + x)] = { true, block };
+                    }
+                }
+                emit_merged_faces(mask, CHUNK_SIZE, WORLD_HEIGHT, [&](int x, int y, int w, int h, BlockType type) {
+                    add_greedy_face(chunk, BlockFace::NORTH, ox + x, y, oz + z + 1.0f, ox + x + w, y + h, oz + z + 1.0f, type);
+                    });
+            }
+
+            for (int z = 0; z < CHUNK_SIZE; ++z) {
+                mask.assign(static_cast<size_t>(CHUNK_SIZE * WORLD_HEIGHT), {});
+                for (int x = 0; x < CHUNK_SIZE; ++x) {
+                    for (int y = 0; y < WORLD_HEIGHT; ++y) {
+                        BlockType block = chunk.blocks[x][y][z];
+                        if (!is_meshing_solid(block) or !should_render_block_face(chunk, x, y, z, BlockFace::SOUTH)) continue;
+                        mask[static_cast<size_t>(y * CHUNK_SIZE + x)] = { true, block };
+                    }
+                }
+                emit_merged_faces(mask, CHUNK_SIZE, WORLD_HEIGHT, [&](int x, int y, int w, int h, BlockType type) {
+                    add_greedy_face(chunk, BlockFace::SOUTH, ox + x, y, oz + z, ox + x + w, y + h, oz + z, type);
+                    });
+            }
+
+            for (int x = 0; x < CHUNK_SIZE; ++x) {
+                mask.assign(static_cast<size_t>(CHUNK_SIZE * WORLD_HEIGHT), {});
+                for (int z = 0; z < CHUNK_SIZE; ++z) {
+                    for (int y = 0; y < WORLD_HEIGHT; ++y) {
+                        BlockType block = chunk.blocks[x][y][z];
+                        if (!is_meshing_solid(block) or !should_render_block_face(chunk, x, y, z, BlockFace::EAST)) continue;
+                        mask[static_cast<size_t>(y * CHUNK_SIZE + z)] = { true, block };
+                    }
+                }
+                emit_merged_faces(mask, CHUNK_SIZE, WORLD_HEIGHT, [&](int z, int y, int w, int h, BlockType type) {
+                    add_greedy_face(chunk, BlockFace::EAST, ox + x + 1.0f, y, oz + z, ox + x + 1.0f, y + h, oz + z + w, type);
+                    });
+            }
+
+            for (int x = 0; x < CHUNK_SIZE; ++x) {
+                mask.assign(static_cast<size_t>(CHUNK_SIZE * WORLD_HEIGHT), {});
+                for (int z = 0; z < CHUNK_SIZE; ++z) {
+                    for (int y = 0; y < WORLD_HEIGHT; ++y) {
+                        BlockType block = chunk.blocks[x][y][z];
+                        if (!is_meshing_solid(block) or !should_render_block_face(chunk, x, y, z, BlockFace::WEST)) continue;
+                        mask[static_cast<size_t>(y * CHUNK_SIZE + z)] = { true, block };
+                    }
+                }
+                emit_merged_faces(mask, CHUNK_SIZE, WORLD_HEIGHT, [&](int z, int y, int w, int h, BlockType type) {
+                    add_greedy_face(chunk, BlockFace::WEST, ox + x, y, oz + z, ox + x, y + h, oz + z + w, type);
+                    });
+            }
+        }
+
 
         bool should_render_block_face(const Chunk& chunk, int x, int y, int z, BlockFace face) {
             int nx = x, ny = y, nz = z;
@@ -638,11 +704,42 @@ namespace Craftbuild {
             case BlockFace::EAST: nx++; break;
             case BlockFace::WEST: nx--; break;
             }
-            if (nx < 0 or nx >= CHUNK_SIZE or nz < 0 or nz >= CHUNK_SIZE or ny < 0 or ny >= WORLD_HEIGHT) {
+            if (ny < 0 or ny >= WORLD_HEIGHT) {
                 return true;
             }
-            BlockType neighbor = chunk.blocks[nx][ny][nz];
-            return (neighbor == BlockType::AIR or neighbor == BlockType::WATER or neighbor == BlockType::LEAVES);
+
+            if (nx >= 0 and nx < CHUNK_SIZE and nz >= 0 and nz < CHUNK_SIZE) {
+                BlockType neighbor = chunk.blocks[nx][ny][nz];
+                return !is_face_occluder(neighbor);
+            }
+
+            int chunk_dx = 0;
+            int chunk_dz = 0;
+            if (nx < 0) {
+                chunk_dx = -1;
+                nx += CHUNK_SIZE;
+            }
+            else if (nx >= CHUNK_SIZE) {
+                chunk_dx = 1;
+                nx -= CHUNK_SIZE;
+            }
+
+            if (nz < 0) {
+                chunk_dz = -1;
+                nz += CHUNK_SIZE;
+            }
+            else if (nz >= CHUNK_SIZE) {
+                chunk_dz = 1;
+                nz -= CHUNK_SIZE;
+            }
+
+            auto neighbor_it = chunk_map.find(make_key(chunk.x + chunk_dx, chunk.z + chunk_dz));
+            if (neighbor_it == chunk_map.end()) {
+                return true;
+            }
+
+            BlockType neighbor = neighbor_it->second.blocks[nx][ny][nz];
+            return !is_face_occluder(neighbor);
         }
 
         void regenerate_world() {
