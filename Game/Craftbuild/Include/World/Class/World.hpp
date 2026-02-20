@@ -1,7 +1,8 @@
 #pragma once
 
-#include <core.hpp>
-#include <World/enum.hpp>
+#include <Core/core.hpp>
+#include <World/Enum/BlockType.hpp>
+#include <World/Enum/BiomeType.hpp>
 #include <World/variable.hpp>
 #include <World/Struct/Block.hpp>
 #include <World/Struct/Chunk.hpp>
@@ -9,97 +10,93 @@
 
 namespace Craftbuild {
     class World {
-        class PerlinNoise {
-            static double fade(double t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-            static double lerp(double t, double a, double b) { return a + t * (b - a); }
-            static double grad(int hash, double x, double y, double z) {
-                int h = hash & 15;
-                double u = h < 8 ? x : y;
-                double v = h < 4 ? y : (h == 12 or h == 14 ? x : z);
-                return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
-            }
-
-        public:
-            PerlinNoise(int seed = 0) {
-                permutation.resize(WORLD_HEIGHT * 2);
-                std::vector<int> p(WORLD_HEIGHT);
-                for (int i = 0; i < WORLD_HEIGHT; ++i) p[i] = i;
-                std::mt19937 engine(seed);
-                std::shuffle(p.begin(), p.end(), engine);
-                for (int i = 0; i < WORLD_HEIGHT; ++i) {
-                    permutation[i] = permutation[i + WORLD_HEIGHT] = p[i];
-                }
-            }
-            double noise(double x, double y, double z) const {
-                int X = static_cast<int>(floor(x)) & (WORLD_HEIGHT - 1);
-                int Y = static_cast<int>(floor(y)) & (WORLD_HEIGHT - 1);
-                int Z = static_cast<int>(floor(z)) & (WORLD_HEIGHT - 1);
-                x -= floor(x); y -= floor(y); z -= floor(z);
-                double u = fade(x), v = fade(y), w = fade(z);
-                int A = permutation[X] + Y, AA = permutation[A] + Z, AB = permutation[A + 1] + Z;
-                int B = permutation[X + 1] + Y, BA = permutation[B] + Z, BB = permutation[B + 1] + Z;
-                return lerp(w, lerp(v, lerp(u, grad(permutation[AA], x, y, z),
-                    grad(permutation[BA], x - 1, y, z)),
-                    lerp(u, grad(permutation[AB], x, y - 1, z),
-                        grad(permutation[BB], x - 1, y - 1, z))),
-                    lerp(v, lerp(u, grad(permutation[AA + 1], x, y, z - 1),
-                        grad(permutation[BA + 1], x - 1, y, z - 1)),
-                        lerp(u, grad(permutation[AB + 1], x, y - 1, z - 1),
-                            grad(permutation[BB + 1], x - 1, y - 1, z - 1))));
-            }
-            double octave_noise(double x, double y, double z, int octaves, double persistence, double lacunarity = 2.0) const {
-                double total = 0.0, amplitude = 1.0, frequency = 1.0, maxValue = 0.0;
-                for (int i = 0; i < octaves; ++i) {
-                    total += noise(x * frequency, y * frequency, z * frequency) * amplitude;
-                    maxValue += amplitude;
-                    amplitude *= persistence;
-                    frequency *= lacunarity;
-                }
-                return total / maxValue;
-            }
-
-        private:
-            std::vector<int> permutation;
-        };
-
-        PerlinNoise continentalness, erosion, peaks_valleys, weirdness, temperature, humidity, cave_noise, tree_noise;
+        FastNoiseLite continentalness, erosion, peaks_valleys, weirdness, temperature, humidity, cave_noise, tree_noise;
         int seed;
 
-        double compute_density(int x, int y, int z) {
-            double cont = continentalness.octave_noise(x * 0.0008, 0, z * 0.0008, 5, 0.5) * 2.0 - 1.0;
-            double ero = erosion.octave_noise(x * 0.0015, 0, z * 0.0015, 4, 0.6) * 2.0 - 1.0;
-            double pv = peaks_valleys.octave_noise(x * 0.002, 0, z * 0.002, 4, 0.5) * 2.0 - 1.0;
-            double weird = weirdness.octave_noise(x * 0.0012, 0, z * 0.0012, 3, 0.5) * 2.0 - 1.0;
+        double get_density(int x, int y, int z) {
+            // ===== 2D terrain shape =====
+            double cont = (continentalness.GetNoise(x * 0.001, z * 0.001) + 1.0) * 0.5;
+            cont = std::pow(cont, 1.3);
 
-            double terrain = cont * 1.2 - ero * 0.5 + pv * 0.8 + weird * 0.3;
+            double erosion_val = erosion.GetNoise(x * 0.002, z * 0.002);
 
-            // Vertical gradient
-            double vertical = (y - 80.0) / 80.0;
+            double peak = peaks_valleys.GetNoise(x * 0.003, z * 0.003);
+            peak = 1.0 - std::abs(peak);
+            peak *= peak;
 
-            // Cave density
-            double cave = cave_noise.octave_noise(x * 0.03, y * 0.03, z * 0.03, 4, 0.5);
-            return terrain - vertical - cave * 0.7;
+            double base_height = 64.0 + cont * 80.0;
+
+            double mountain = peak * cont * 120.0;
+            mountain *= (1.0 - (erosion_val + 1.0) * 0.5);
+
+            double terrain_height = base_height + mountain;
+
+            // ===== convert to density =====
+            double height_density = terrain_height - y;
+
+            // ===== 3D cave =====
+            double cheese = cave_noise.GetNoise(x * 0.03, y * 0.03, z * 0.03);
+            double noodle = cave_noise.GetNoise(x * 0.08, y * 0.08, z * 0.08);
+
+            double cave = std::max(cheese * 1.2, noodle);
+
+            double depth_factor = std::clamp(1.0 - (double)y / WORLD_HEIGHT, 0.0, 1.0);
+
+            return height_density - cave * 30.0 * depth_factor;
+        }
+
+        double get_height(int x, int z) {
+            double cont = (continentalness.GetNoise(x * 0.001, z * 0.001) + 1.0) * 0.5;
+            cont = std::pow(cont, 1.3);
+            double ero = erosion.GetNoise(x * 0.002, z * 0.002);
+            double peak = peaks_valleys.GetNoise(x * 0.003, z * 0.003);
+            peak = 1.0 - std::abs(peak);
+            peak = peak * peak;
+            double w = weirdness.GetNoise(x * 0.004, z * 0.004);
+            double base_height = 64.0 + cont * 80.0;
+            double mountain = peak * cont * 120.0;
+            double erosion_factor = (ero + 1.0) * 0.5;
+            mountain *= (1.0 - erosion_factor);
+            double final_height = base_height + mountain;
+
+            return std::clamp(final_height, 0.0, 320.0);
         }
 
         BiomeType get_biome(int x, int z) {
-            double cont = continentalness.octave_noise(x * 0.0008, 0, z * 0.0008, 5, 0.5) * 2.0 - 1.0;
-            double temp = temperature.octave_noise(x * 0.0005, 0, z * 0.0005, 4, 0.5) * 2.0 - 1.0;
-            double humid = humidity.octave_noise(x * 0.0007, 0, z * 0.0007, 4, 0.5) * 2.0 - 1.0;
+            double temp = temperature.GetNoise(x * 0.0005, z * 0.0005) * 2.0 - 1.0;
+            double humid = humidity.GetNoise(x * 0.0007, z * 0.0007) * 2.0 - 1.0;
+            double height = get_height(x, z);
 
-            if (cont < -0.4) return BiomeType::OCEAN;
-            if (cont < -0.2) return BiomeType::BEACH;
+            if (height < 62) return BiomeType::OCEAN;
+            if (height < 65) return BiomeType::BEACH;
 
-            if (temp < -0.5) return BiomeType::TAIGA;
-
+            if (temp < -0.4) return BiomeType::TAIGA;
             if (temp > 0.6) {
-                if (humid < -0.2) return BiomeType::DESERT;
+                if (humid < -0.3) return BiomeType::DESERT;
                 if (humid > 0.5) return BiomeType::JUNGLE;
                 return BiomeType::SAVANNA;
             }
-
             if (humid > 0.6) return BiomeType::SWAMP;
+            if (height > 140) return BiomeType::MOUNTAINS;
+
+            double forest = tree_noise.GetNoise(x * 0.002, z * 0.002);
+            if (forest > 0.4 and humid > 0.2) return BiomeType::FOREST;
 
             return BiomeType::PLAINS;
+        }
+
+        bool should_generate_cave(int x, int y, int z) {
+            if (y < 10 or y > 100) return false;
+
+            // Cheese caves (big round holes)
+            double cheese = cave_noise.GetNoise(x * 0.03, y * 0.03, z * 0.03);
+            // Noodle caves (thin tunnels)
+            double noodle = cave_noise.GetNoise(x * 0.08, y * 0.08, z * 0.08);
+            // Spaghetti caves (winding tunnels)
+            double spaghetti = cave_noise.GetNoise(x * 0.05, y * 0.05, z * 0.05);
+
+            double density = 0.65 - (y / 256.0) * 0.3;
+            return (cheese > density * 1.2) or (noodle > density * 0.9) or (spaghetti > density * 1.0);
         }
 
         void generate_terrain(Chunk& chunk) {
@@ -110,17 +107,15 @@ namespace Craftbuild {
 
                     for (int ly = 0; ly < WORLD_HEIGHT; ++ly) {
                         int wy = ly;
+                        double density = get_density(wx, wy, wz);
+                        if (wy <= 4) {
+                            if (wy <= rand() % 5)
+                                chunk.blocks[lx][ly][lz] = BlockType::BEDROCK;
+                            else
+                                chunk.blocks[lx][ly][lz] = BlockType::STONE;
 
-                        if (wy == 0) {
-                            chunk.blocks[lx][ly][lz] = BlockType::BEDROCK;
                             continue;
                         }
-                        else if (wy < 5) {
-                            chunk.blocks[lx][ly][lz] = BlockType::STONE;
-                            continue;
-                        }
-
-                        double density = compute_density(wx, wy, wz);
 
                         if (density > 0.0) {
                             chunk.blocks[lx][ly][lz] = BlockType::STONE;
@@ -136,15 +131,32 @@ namespace Craftbuild {
             }
         }
 
+        void generate_caves(Chunk& chunk) {
+            for (int lx = 0; lx < CHUNK_SIZE; ++lx) {
+                for (int ly = 0; ly < WORLD_HEIGHT; ++ly) {
+                    for (int lz = 0; lz < CHUNK_SIZE; ++lz) {
+                        int wx = chunk.x * CHUNK_SIZE + lx;
+                        int wz = chunk.z * CHUNK_SIZE + lz;
+                        BlockType& block = chunk.blocks[lx][ly][lz];
+                        if (block != BlockType::AIR and block != BlockType::WATER and block != BlockType::BEDROCK) {
+                            if (should_generate_cave(wx, ly, wz)) {
+                                block = BlockType::AIR;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         void generate_trees(Chunk& chunk) {
             std::mt19937 rng(seed + chunk.x * 73856093 + chunk.z * 19349663);
             std::uniform_int_distribution<> height_dist(5, 12);
             std::uniform_real_distribution<> rand(0.0, 1.0);
 
-            for (int lx = 0; lx < CHUNK_SIZE; ++lx) {
-                for (int lz = 0; lz < CHUNK_SIZE; ++lz) {
-                    int wx = chunk.x * CHUNK_SIZE + lx;
-                    int wz = chunk.z * CHUNK_SIZE + lz;
+            for (int lx = 0; lx < 16; ++lx) {
+                for (int lz = 0; lz < 16; ++lz) {
+                    int wx = chunk.x * 16 + lx;
+                    int wz = chunk.z * 16 + lz;
                     BiomeType biome = get_biome(wx, wz);
 
                     double density = 0.0;
@@ -158,7 +170,7 @@ namespace Craftbuild {
                     if (rand(rng) > density) continue;
 
                     int ground_y = -1;
-                    for (int ly = WORLD_HEIGHT; ly >= 0; --ly) {
+                    for (int ly = 382; ly >= 0; --ly) {
                         if (chunk.blocks[lx][ly][lz] == BlockType::GRASS or
                             chunk.blocks[lx][ly][lz] == BlockType::DIRT or
                             chunk.blocks[lx][ly][lz] == BlockType::SAND) {
@@ -171,7 +183,7 @@ namespace Craftbuild {
                     int height = height_dist(rng);
                     for (int h = 1; h <= height; ++h) {
                         int ty = ground_y + h;
-                        if (ty >= WORLD_HEIGHT) break;
+                        if (ty >= 383) break;
                         chunk.blocks[lx][ty][lz] = BlockType::WOOD;
                     }
 
@@ -181,7 +193,7 @@ namespace Craftbuild {
                         for (int dz = -radius; dz <= radius; ++dz) {
                             for (int dy = -radius / 2; dy <= radius; ++dy) {
                                 int px = lx + dx, pz = lz + dz, py = leaf_y + dy;
-                                if (px < 0 or px >= CHUNK_SIZE or pz < 0 or pz >= CHUNK_SIZE or py < 0 or py >= WORLD_HEIGHT) continue;
+                                if (px < 0 or px >= 16 or pz < 0 or pz >= 16 or py < 0 or py >= 383) continue;
 
                                 double dist = std::sqrt(dx * dx + dy * dy * 0.7 + dz * dz);
                                 if (dist <= radius + rand(rng) * 0.6 - 0.3) {
@@ -196,63 +208,49 @@ namespace Craftbuild {
             }
         }
 
-        void decorate_surface(Chunk& chunk, BiomeType biome) {
-            std::mt19937 rng(seed + chunk.x * 10007 + chunk.z * 10009);
-            std::uniform_real_distribution<> rand(0.0, 1.0);
+        void decorate_surface(Chunk& chunk) {
+            for (int lx = 0; lx < CHUNK_SIZE; ++lx) {
+                for (int lz = 0; lz < CHUNK_SIZE; ++lz) {
+                    int wx = chunk.x * CHUNK_SIZE + lx;
+                    int wz = chunk.z * CHUNK_SIZE + lz;
 
-            for (int lx = 0; lx < 16; ++lx) {
-                for (int lz = 0; lz < 16; ++lz) {
-                    int ground_y = -1;
-                    for (int ly = 382; ly >= 0; --ly) {
-                        BlockType b = chunk.blocks[lx][ly][lz];
-                        if (b == BlockType::GRASS or b == BlockType::DIRT or b == BlockType::SAND) {
-                            ground_y = ly;
-                            break;
+                    BiomeType biome = get_biome(wx, wz);
+
+                    int surface_depth = 0;
+
+                    for (int ly = WORLD_HEIGHT - 1; ly >= 0; --ly) {
+                        BlockType& b = chunk.blocks[lx][ly][lz];
+
+                        if (b == BlockType::AIR) {
+                            surface_depth = 0;
+                            continue;
                         }
-                    }
-                    if (ground_y < 0 or ground_y >= 382) continue;
 
-                    if ((biome == BiomeType::TAIGA and rand(rng) < 0.7) or
-                        (biome == BiomeType::MOUNTAINS and ground_y > 140 and rand(rng) < 0.9)) {
-                        if (chunk.blocks[lx][ground_y + 1][lz] == BlockType::AIR) {
-                            chunk.blocks[lx][ground_y][lz] = BlockType::SNOW;
-                        }
-                    }
-
-                    if (chunk.blocks[lx][ground_y + 1][lz] == BlockType::AIR) {
-                        if (biome == BiomeType::PLAINS or biome == BiomeType::FOREST) {
-                            if (rand(rng) < 0.25) {
-                                chunk.blocks[lx][ground_y + 1][lz] = BlockType::GRASS_PLANT;
+                        if (b == BlockType::STONE) {
+                            if (surface_depth == 0) {
+                                switch (biome) {
+                                case BiomeType::DESERT:
+                                case BiomeType::BEACH: b = BlockType::SAND; break;
+                                default: b = BlockType::GRASS;
+                                }
                             }
+                            else if (surface_depth < 4) {
+                                b = BlockType::DIRT;
+                            }
+
+                            surface_depth++;
                         }
                     }
                 }
             }
         }
 
-        void build_surface(Chunk& chunk) {
-            for (int lx = 0; lx < CHUNK_SIZE; ++lx) {
-                for (int lz = 0; lz < CHUNK_SIZE; ++lz) {
-                    int depth = 0;
-
-                    for (int ly = WORLD_HEIGHT - 1; ly >= 0; --ly) {
-                        BlockType& b = chunk.blocks[lx][ly][lz];
-
-                        if (b == BlockType::AIR) {
-                            depth = 0;
-                        }
-                        else if (b == BlockType::STONE) {
-                            if (depth == 0 && ly > 62) {
-                                b = BlockType::GRASS;
-                            }
-                            else if (depth < 4) {
-                                b = BlockType::DIRT;
-                            }
-                            depth++;
-                        }
-                    }
-                }
-            }
+        void set_seed(FastNoiseLite& noise, int seed, float octaves, float frequency) {
+            noise.SetSeed(seed);
+            noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+            noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+            noise.SetFractalOctaves(octaves);
+            noise.SetFrequency(frequency);
         }
 
     public:
@@ -268,20 +266,20 @@ namespace Craftbuild {
 
         void generate_chunk(Chunk& chunk) {
             generate_terrain(chunk);
-            build_surface(chunk);
+            decorate_surface(chunk);
             generate_trees(chunk);
         }
 
         void set_seed(int seed) {
             this->seed = seed;
-            continentalness = PerlinNoise(seed);
-            erosion = PerlinNoise(seed + 1);
-            peaks_valleys = PerlinNoise(seed + 2);
-            weirdness = PerlinNoise(seed + 3);
-            temperature = PerlinNoise(seed + 4);
-            humidity = PerlinNoise(seed + 5);
-            cave_noise = PerlinNoise(seed + 6);
-            tree_noise = PerlinNoise(seed + 7);
+			set_seed(continentalness, seed, 5, 0.003f);
+            set_seed(erosion, seed << 1, 3, 0.01f);
+            set_seed(peaks_valleys, seed << 2, 3, 0.01f);
+            set_seed(weirdness, seed << 3, 5, 0.003f);
+            set_seed(temperature, seed << 4, 5, 0.003f);
+            set_seed(humidity, seed << 5, 3, 0.01f);
+            set_seed(cave_noise, seed << 6, 3, 0.01f);
+            set_seed(tree_noise, seed << 6, 5, 0.003f);
         }
 
         int get_seed() const {

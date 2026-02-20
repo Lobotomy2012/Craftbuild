@@ -1,9 +1,7 @@
 #pragma once
 
-#include <core.hpp>
-
 namespace Craftbuild {
-    enum class BlockType : uint8_t {
+    enum class BlockType {
         GRASS = 0,
         DIRT,
         STONE,
@@ -18,19 +16,5 @@ namespace Craftbuild {
         GRASS_PLANT,
         GLASS,
         AIR = 255
-    };
-
-    enum class BiomeType {
-        PLAINS,
-        MOUNTAINS,
-        DESERT,
-        FOREST,
-        OCEAN,
-        RIVER,
-        BEACH,
-        TAIGA,
-        SWAMP,
-        JUNGLE,
-        SAVANNA
     };
 }

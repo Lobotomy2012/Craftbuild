@@ -1,4 +1,4 @@
-#include <core.hpp>
+#include <Core/core.hpp>
 #include <Graphics/Class/Main.hpp>
 
 int main() {

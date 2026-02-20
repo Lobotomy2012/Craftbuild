@@ -1,7 +1,7 @@
 #pragma once
 
-#include <core.hpp>
-#include <World/enum.hpp>
+#include <Core/core.hpp>
+#include <World/Enum/BlockType.hpp>
 #include <World/variable.hpp>
 #include <Graphics/Struct/Vertex.hpp>
 

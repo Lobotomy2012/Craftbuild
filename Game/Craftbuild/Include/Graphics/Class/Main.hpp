@@ -1,6 +1,6 @@
 #pragma once
 
-#include <core.hpp>
+#include <Core/core.hpp>
 #include <World/Class/World.hpp>
 #include <Player/Class/Player.hpp>
 #include <Graphics/variable.hpp>

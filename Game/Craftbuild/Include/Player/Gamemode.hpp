@@ -1,6 +1,6 @@
 #pragma once
 
-#include <core.hpp>
+#include <Core/core.hpp>
 
 namespace Craftbuild {
 	enum class Gamemode {

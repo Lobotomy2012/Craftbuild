@@ -1,7 +1,7 @@
 #pragma once
 
-#include <core.hpp>
-#include <World/enum.hpp>
+#include <Core/core.hpp>
+#include <World/Enum/BlockType.hpp>
 
 namespace Craftbuild {
 	constexpr uint8_t CHUNK_SIZE = 16;

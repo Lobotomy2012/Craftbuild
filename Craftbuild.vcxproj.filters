@@ -18,6 +18,9 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Craftbuild\Include\Core\Registry.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Craftbuild\Include\Graphics\Class\Main.hpp">
@@ -26,10 +29,7 @@
     <ClInclude Include="Game\Craftbuild\Include\World\Class\Frustum.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Craftbuild\Include\World\enum.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Game\Craftbuild\Include\core.hpp">
+    <ClInclude Include="Game\Craftbuild\Include\World\Enum\BlockType.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Craftbuild\Include\Graphics\variable.hpp">
@@ -50,9 +50,6 @@
     <ClInclude Include="Game\Craftbuild\Include\Player\Class\Player.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Craftbuild\Include\Player\enum.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Game\Craftbuild\Include\Player\variable.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -69,6 +66,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Game\Craftbuild\Include\World\Struct\Block.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\Core\core.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\Player\Gamemode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Craftbuild\Include\World\Enum\BiomeType.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,7 +1,6 @@
 #pragma once
 
-#include <core.hpp>
-#include <World/enum.hpp>
+#include <World/Enum/BlockType.hpp>
 
 namespace Craftbuild {
     struct Block {

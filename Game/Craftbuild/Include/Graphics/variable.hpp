@@ -1,6 +1,6 @@
 #pragma once
 
-#include <core.hpp>
+#include <Core/core.hpp>
 
 namespace Craftbuild {
 	constexpr float GAME_VERSION = 1.0f;
@@ -16,11 +16,4 @@ namespace Craftbuild {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
-#ifdef _DEBUG
-    constexpr bool enable_validation_layers = true;
-#else
-    constexpr bool enable_validation_layers = false;
-#endif
-
-    constexpr bool log_verbose = true;
 }

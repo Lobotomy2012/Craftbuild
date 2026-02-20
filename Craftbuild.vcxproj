@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.321.1\Include;.\Lib\GLAD\include;.\Lib\GLFW\include;.\Lib\GLM;.\Lib\STB;.\Lib\TinyObjLoader;.\Game\Craftbuild\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\C++ files\Craftbuild\Lib\FastNoiseLite;C:\VulkanSDK\1.4.321.1\Include;.\Lib\GLAD\include;.\Lib\GLFW\include;.\Lib\GLM;.\Lib\STB;.\Lib\TinyObjLoader;.\Game\Craftbuild\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -130,10 +130,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Craftbuild\Include\Core\Registry.hpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Game\Craftbuild\Include\core.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\Core\core.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Graphics\function.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Graphics\Class\Main.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\QueueFamilyIndices.hpp" />
@@ -141,10 +142,11 @@
     <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\SwapChainSupportDetails.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Graphics\Struct\Vertex.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Graphics\variable.hpp" />
-    <ClInclude Include="Game\Craftbuild\Include\Player\enum.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\Player\Gamemode.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Player\Class\Player.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\Player\variable.hpp" />
-    <ClInclude Include="Game\Craftbuild\Include\World\enum.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\World\Enum\BiomeType.hpp" />
+    <ClInclude Include="Game\Craftbuild\Include\World\Enum\BlockType.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\World\Struct\Block.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\World\Struct\Chunk.hpp" />
     <ClInclude Include="Game\Craftbuild\Include\World\variable.hpp" />
