@@ -1,0 +1,59 @@
+[gd_scene format=3 uid="uid://d3smrgb72m8sy"]
+
+[ext_resource type="Script" uid="uid://rfbej7xfj0am" path="res://assets/scripts/main/control.gd" id="1_yqjtg"]
+[ext_resource type="Script" uid="uid://tkffwo1ryjxb" path="res://assets/scripts/main/pause_btn.gd" id="2_lbhrr"]
+[ext_resource type="Texture2D" uid="uid://cr636nlqo7j20" path="res://assets/textures/skin/creeper_boy.png" id="2_lnu2h"]
+[ext_resource type="Script" uid="uid://c0ceo8cbu6ogd" path="res://assets/scripts/main/leave_btn.gd" id="3_lbhrr"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_lbhrr"]
+radius = 0.3
+height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_iywne"]
+transparency = 4
+shading_mode = 0
+albedo_texture = ExtResource("2_lnu2h")
+albedo_texture_force_srgb = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_p57ef"]
+size = Vector3(0.6, 1.8, 0.3)
+
+[node name="main" type="Main" unique_id=1493251702]
+
+[node name="player" type="Player" parent="." unique_id=2000336194]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82.81972, 63.000984, 63.470955)
+velocity = Vector3(0, 0, 5)
+
+[node name="shape" type="CollisionShape3D" parent="player" unique_id=1808141800]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_lbhrr")
+
+[node name="camera" type="Camera3D" parent="player" unique_id=282328567]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+current = true
+
+[node name="mesh" type="MeshInstance3D" parent="player" unique_id=1273041936]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+material_override = SubResource("StandardMaterial3D_iywne")
+mesh = SubResource("BoxMesh_p57ef")
+
+[node name="pause_btn" type="Button" parent="." unique_id=1180982376]
+offset_left = 1.0
+offset_top = 284.0
+offset_right = 206.0
+offset_bottom = 331.0
+offset_transform_position = Vector2(1, 0)
+text = "Resume"
+script = ExtResource("2_lbhrr")
+
+[node name="leave_btn" type="Button" parent="." unique_id=34333985]
+offset_left = 1.0
+offset_top = 347.0
+offset_right = 206.0
+offset_bottom = 394.0
+offset_transform_position = Vector2(1, 0)
+text = "Leave"
+script = ExtResource("3_lbhrr")
+
+[node name="control" type="Node" parent="." unique_id=388242962]
+script = ExtResource("1_yqjtg")

@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://b5wynaoplraj3"]
+
+[ext_resource type="Script" uid="uid://dxln5m6miiwd0" path="res://assets/scripts/menu/play_btn.gd" id="1_e5g8k"]
+[ext_resource type="Script" uid="uid://4kpelmigxnuv" path="res://assets/scripts/menu/quit_btn.gd" id="2_vjb58"]
+
+[node name="menu" type="Control" unique_id=2034666212]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="play_btn" type="Button" parent="." unique_id=962739249]
+layout_mode = 0
+offset_left = 2.0
+offset_top = 209.0
+offset_right = 436.0
+offset_bottom = 271.0
+text = "Play"
+script = ExtResource("1_e5g8k")
+
+[node name="setting_btn" type="Button" parent="." unique_id=367989815]
+layout_mode = 0
+offset_left = 3.0
+offset_top = 285.0
+offset_right = 437.0
+offset_bottom = 361.0
+text = "Setting"
+
+[node name="quit_btn" type="Button" parent="." unique_id=833558816]
+layout_mode = 0
+offset_left = 3.0
+offset_top = 376.0
+offset_right = 437.0
+offset_bottom = 452.0
+text = "Quit"
+script = ExtResource("2_vjb58")
