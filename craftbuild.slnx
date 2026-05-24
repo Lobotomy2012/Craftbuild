@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="craftbuild.vcxproj" Id="3a7299c0-80de-4f2f-85bf-2117be8a1dd6" />
+</Solution>

@@ -1,0 +1,53 @@
+module;
+
+#include <godot_cpp/classes/texture2d.hpp>
+#include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/classes/texture2d_array.hpp>
+
+#include <includes.hpp>
+
+export module game.texture.asset_loader;
+
+import misc.ptr;
+import misc.types;
+import misc.format;
+import game.logger;
+
+using namespace godot;
+
+export namespace craftbuild {
+    enum class FaceCount : uint8 {
+        ONE = 1,
+        THREE = 3,
+        SIX = 6
+    };
+
+    struct AssetLoader {
+        inline static std::string base_path = "res://assets/textures/block/";
+
+        static ref<Texture2D> load_block_texture(size id, const char* path_suffix, const FaceCount face_count) {
+            if (path_suffix == nullptr or std::string(path_suffix).empty()) {
+                return ref<Texture2D>();
+            }
+
+            String full_path = base_path.c_str();
+
+            if (face_count == FaceCount::ONE)        full_path += "1 face/";
+            else if (face_count == FaceCount::THREE) full_path += "3 faces/";
+            else if (face_count == FaceCount::SIX)   full_path += "6 faces/";
+
+            full_path += path_suffix;
+
+            ref<Texture2D> tex = ResourceLoader::get_singleton()->load(full_path);
+            if (tex.is_valid()) {
+                log<LogType::VERBOSE>(format{} << "Loaded texture: " << full_path.ascii());
+                return tex;
+            }
+            else {
+                log<LogType::ERROR>(format{} << "Failed to load texture: " << full_path.ascii());
+            }
+            return ref<Texture2D>();
+        }
+    };
+}

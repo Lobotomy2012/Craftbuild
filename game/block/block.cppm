@@ -1,0 +1,209 @@
+module;
+
+#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
+
+#include <includes.hpp>
+#include <functional>
+
+export module game.block;
+
+import misc.ptr;
+import misc.types;
+import game.pos;
+import game.core;
+import game.texture.asset_loader;
+
+using namespace godot;
+
+export namespace craftbuild {
+    constexpr uint8 FACE_LEN = 6;
+
+    enum class Face : uint8 {
+        TOP,
+        BOTTOM,
+        RIGHT,
+        LEFT,
+        FRONT,
+        BACK
+    };
+
+    struct TagEntry {
+        std::string name;
+        std::vector<uint64> value;
+
+        TagEntry() = default;
+        TagEntry(const std::string& n) : name(n) {}
+    };
+
+    struct TagRegistry {
+        inline static std::vector<TagEntry> tag;
+        inline static std::unordered_map<std::string, uint32> tag2id;
+
+        static none register_tag(const std::string& name) {
+            tag.push_back(name);
+            tag2id[name] = tag.size() - 1;
+        }
+
+        static none set_value(uint32 tag_id, uint64 value) {
+			if (tag_id >= tag.size()) return;
+            tag[tag_id].value.push_back(value);
+        }
+
+        static std::vector<uint64>& get_value(uint32 tag_id) {
+            return tag[tag_id].value;
+        }
+
+        static std::string get_name(uint32 tag_id) {
+            return tag[tag_id].name;
+        }
+
+        static uint32 get_id(const std::string& tag_name) {
+            if (tag2id.find(tag_name) == tag2id.end()) return 0;
+            return tag2id[tag_name];
+        }
+    };
+
+    class Block {
+    protected:
+        int base_texture_layer = 0;
+
+    public:
+        virtual ~Block() = default;
+        virtual int get_texture_layer(Face face) const = 0;
+
+		virtual std::vector<std::pair<std::string, uint64>> init_tags() { return {}; }
+
+        static none create_face(Face face, const Vector3& pos, std::vector<Pos<real>>& vertices) {
+            switch (face) {
+            case Face::TOP: // +Y
+                vertices.push_back(pos + Vector3(1, 1, 0));
+                vertices.push_back(pos + Vector3(0, 1, 0));
+                vertices.push_back(pos + Vector3(0, 1, 1));
+                vertices.push_back(pos + Vector3(1, 1, 1));
+                break;
+            case Face::BOTTOM: // -Y
+                vertices.push_back(pos + Vector3(1, 0, 1));
+                vertices.push_back(pos + Vector3(0, 0, 1));
+                vertices.push_back(pos + Vector3(0, 0, 0));
+                vertices.push_back(pos + Vector3(1, 0, 0));
+                break;
+            case Face::RIGHT: // +X
+                vertices.push_back(pos + Vector3(1, 1, 0));
+                vertices.push_back(pos + Vector3(1, 1, 1));
+                vertices.push_back(pos + Vector3(1, 0, 1));
+                vertices.push_back(pos + Vector3(1, 0, 0));
+                break;
+            case Face::LEFT: // -X
+                vertices.push_back(pos + Vector3(0, 1, 1));
+                vertices.push_back(pos + Vector3(0, 1, 0));
+                vertices.push_back(pos + Vector3(0, 0, 0));
+                vertices.push_back(pos + Vector3(0, 0, 1));
+                break;
+            case Face::FRONT: // +Z
+                vertices.push_back(pos + Vector3(1, 1, 1));
+                vertices.push_back(pos + Vector3(0, 1, 1));
+                vertices.push_back(pos + Vector3(0, 0, 1));
+                vertices.push_back(pos + Vector3(1, 0, 1));
+                break;
+            case Face::BACK: // -Z
+                vertices.push_back(pos + Vector3(0, 1, 0));
+                vertices.push_back(pos + Vector3(1, 1, 0));
+                vertices.push_back(pos + Vector3(1, 0, 0));
+                vertices.push_back(pos + Vector3(0, 0, 0));
+                break;
+            }
+        }
+
+        friend class AtlasTexture;
+    };
+
+    class Block1F : public Block {
+    public:
+        int get_texture_layer(Face face) const override {
+            return base_texture_layer;
+        }
+    };
+    class Block3F : public Block {
+    public:
+        int get_texture_layer(Face face) const override {
+            if (face == Face::TOP)    return base_texture_layer;
+            if (face == Face::BOTTOM) return base_texture_layer + 1;
+            return base_texture_layer + 2;
+        }
+    };
+    class Block6F : public Block {
+    public:
+        int get_texture_layer(Face face) const override {
+            switch (face) {
+            case Face::TOP:    return base_texture_layer;
+            case Face::BOTTOM: return base_texture_layer + 1;
+            case Face::LEFT:   return base_texture_layer + 2;
+            case Face::RIGHT:  return base_texture_layer + 3;
+            case Face::FRONT:  return base_texture_layer + 4;
+            case Face::BACK:   return base_texture_layer + 5;
+            }
+            return base_texture_layer;
+        }
+    };
+
+    struct BlockEntry {
+        ptr<Block> block;
+        std::string name;
+        ref<Texture2D> texture;
+
+        BlockEntry(ptr<Block> b, const std::string& n, ref<Texture2D> t) : block(b), name(n), texture(t) {}
+    };
+
+    struct BlockRegistry {
+        inline static std::vector<BlockEntry> registry;
+        inline static std::unordered_map<std::string, uint32> name2id;
+
+        template <typename T>
+        requires std::derived_from<T, Block>
+        static none register_block(const std::string& name, const char* path) {
+            ptr<Block> block = new T();
+            ref<Texture2D> texture;
+            if (dynamic_cast<Block1F*>(block.c_ptr())) {
+                texture = AssetLoader::load_block_texture(registry.size(), path, FaceCount::ONE);
+            }
+            else if (dynamic_cast<Block3F*>(block.c_ptr())) {
+                texture = AssetLoader::load_block_texture(registry.size(), path, FaceCount::THREE);
+            }
+            else if (dynamic_cast<Block6F*>(block.c_ptr())) {
+                texture = AssetLoader::load_block_texture(registry.size(), path, FaceCount::SIX);
+            }
+			for (const auto& pair : block.value().init_tags()) {
+				TagRegistry::set_value(TagRegistry::get_id(pair.first), pair.second);
+			}
+            registry.emplace_back(block, name, texture);
+            name2id[name] = registry.size() - 1;
+        }
+
+        static ptr<Block> get_block(uint32 block_id) {
+            if (registry.size() <= block_id) return registry[get_id("Air")].block;
+            return registry[block_id].block;
+        }
+
+        static std::string get_name(uint32 block_id) {
+            if (registry.size() <= block_id) return "Air";
+            return registry[block_id].name;
+        }
+
+        static uint32 get_id(const std::string& block_name) {
+            if (name2id.find(block_name) == name2id.end()) return 0;
+            return name2id[block_name];
+        }
+    };
+
+    struct BlockStorage {
+        uint8 block_id;
+        uint8 tag;
+    };
+    struct BlockStorageFull {
+        uint32 block_id;
+        uint32 tag;
+        uint16 tag_data;
+    };
+}
