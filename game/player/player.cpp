@@ -102,7 +102,7 @@ namespace craftbuild {
             }
         }
         else gamemode_toggled = false;
-        if (gamemode == Gamemode::Creative or gamemode == Gamemode::Spectator) can_fly = true;
+        if (gamemode == Gamemode::Spectator) can_fly = true;
     }
 
     none Player::_physics_process(float64 delta) {

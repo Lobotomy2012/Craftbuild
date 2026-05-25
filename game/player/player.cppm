@@ -27,8 +27,8 @@ export namespace craftbuild {
     public:
         // Movement
         float32 speed = 5.0f;
-        float32 gravity = 4.0f;
-        float32 jump_velocity = 2.0f;
+        float32 gravity = 24.0f;
+        float32 jump_velocity = 7.0f;
         bool is_grounded = false;
         bool can_fly = false;
         bool running = false;
