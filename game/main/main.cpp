@@ -306,8 +306,7 @@ namespace craftbuild {
 
             auto last_unload_time = std::chrono::high_resolution_clock::now();
             while (running.load()) {
-                submit_terrain_jobs();
-                submit_mesh_jobs();
+                submit_jobs();
 
                 auto now = std::chrono::high_resolution_clock::now();
                 if (std::chrono::duration_cast<std::chrono::seconds>(now - last_unload_time).count() >= 5) {
@@ -316,63 +315,76 @@ namespace craftbuild {
                 }
 
                 std::unique_lock<std::mutex> lock(loop_mutex);
-                loop_cv.wait_for(lock, std::chrono::milliseconds(250));
+                loop_cv.wait_for(lock, std::chrono::milliseconds(100));
             }
         });
     }
 
-    none Main::submit_terrain_jobs() {
+    none Main::submit_jobs() {
         const int px = (int)std::floor(player_x.load() / Chunk::SIZE_X);
         const int pz = (int)std::floor(player_z.load() / Chunk::SIZE_Z);
+        static constexpr int max_jobs_per_tick = 32;
+        int submitted = 0;
 
         for (int r = 0; r <= render_distance; ++r) {
             for (int x = -r; x <= r; ++x) {
                 for (int z = -r; z <= r; ++z) {
                     if (std::abs(x) != r and std::abs(z) != r) continue;
 
-                    terrain_pool.enqueue([this, px, pz, x, z]() {
-                        if (not running.load()) return;
+                    Pos<int> chunk_pos{ px + x, 0, pz + z };
+                    auto chunk = get_or_create_chunk(chunk_pos);
 
-                        auto chunk = get_or_create_chunk({ px + x, 0, pz + z });
+                    // Terrain
+                    if (not chunk.value().generated.load(std::memory_order_acquire)) {
+                        {
+                            std::lock_guard lock(pending_jobs_mutex);
+                            if (pending_terrain_jobs.contains(chunk_pos)) continue;
+                            pending_terrain_jobs.insert(chunk_pos);
+                        }
 
-                        if (not chunk.value().generated.load(std::memory_order_acquire)) {
-                            chunk.value().generate_terrain(world_seed.load(), noise);
-                            chunk.value().dirty.store(true, std::memory_order_release);
+                        terrain_pool.enqueue([this, chunk, chunk_pos]() {
+                            if (running.load()) {
+                                if (not chunk.value().generated.load(std::memory_order_acquire)) {
+                                    chunk.value().generate_terrain(world_seed.load(), noise);
+                                    chunk.value().dirty.store(true, std::memory_order_release);
 
-                            Pos<int> offsets[4] = { {1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1} };
-                            for (auto& o : offsets) {
-                                auto n = get_chunk(chunk.value().chunk_pos.x + o.x, chunk.value().chunk_pos.z + o.z);
-                                if (n and n.value().generated.load(std::memory_order_acquire)) n.value().dirty.store(true);
+                                    Pos<int> offsets[4] = { {1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1} };
+                                    for (auto& o : offsets) {
+                                        auto n = get_chunk(chunk.value().chunk_pos.x + o.x, chunk.value().chunk_pos.z + o.z);
+                                        if (n and n.value().generated.load(std::memory_order_acquire)) n.value().dirty.store(true);
+                                    }
+                                }
+                            }
+
+                            std::lock_guard lock(pending_jobs_mutex);
+                            pending_terrain_jobs.erase(chunk_pos);
+                        });
+                    }
+
+                    // Mesh
+                    if (not chunk.value().dirty.load(std::memory_order_acquire) or chunk.value().mesh_ready.load(std::memory_order_acquire)) continue;
+                    
+                    {
+                        std::lock_guard lock(pending_jobs_mutex);
+                        if (pending_mesh_jobs.contains(chunk_pos)) continue;
+                        pending_mesh_jobs.insert(chunk_pos);
+                    }
+
+                    mesh_pool.enqueue([this, chunk, chunk_pos]() {
+                        if (running.load(std::memory_order_relaxed)) {
+                            if (chunk.value().dirty.load() and not chunk.value().mesh_ready.load()) {
+                                generate_mesh(chunk);
+
+                                chunk.value().mesh_ready.store(true);
+                                chunk.value().dirty.store(false);
                             }
                         }
+
+                        std::lock_guard lock(pending_jobs_mutex);
+                        pending_mesh_jobs.erase(chunk_pos);
                     });
-                }
-            }
-        }
-    }
 
-    none Main::submit_mesh_jobs() {
-        const int px = (int)std::floor(player_x.load() / Chunk::SIZE_X);
-        const int pz = (int)std::floor(player_z.load() / Chunk::SIZE_Z);
-
-        for (int r = 0; r <= render_distance; ++r) {
-            for (int x = -r; x <= r; ++x) {
-                for (int z = -r; z <= r; ++z) {
-                    if (std::abs(x) != r and std::abs(z) != r)continue;
-
-                    auto chunk = get_chunk(px + x, pz + z);
-                    if (not chunk) continue;
-
-                    mesh_pool.enqueue([this, chunk]() {
-                        if (not running.load(std::memory_order_relaxed)) return;
-
-                        if (chunk.value().dirty.load() and not chunk.value().mesh_ready.load()) {
-                            generate_mesh(chunk);
-
-                            chunk.value().mesh_ready.store(true);
-                            chunk.value().dirty.store(false);
-                        }
-                    });
+                    if (++submitted >= max_jobs_per_tick) return;
                 }
             }
         }

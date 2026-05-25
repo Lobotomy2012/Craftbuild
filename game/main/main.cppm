@@ -16,6 +16,7 @@ module;
 #include <shared_mutex>
 #include <deque>
 #include <memory>
+#include <unordered_set>
 
 export module game.main;
 
@@ -60,6 +61,9 @@ export namespace craftbuild {
         std::thread scheduler_thread;
         ThreadPool terrain_pool{ 4 };
         ThreadPool mesh_pool{ 4 };
+        std::unordered_set<Pos<int>, PosHash<int>> pending_terrain_jobs;
+        std::unordered_set<Pos<int>, PosHash<int>> pending_mesh_jobs;
+        std::mutex pending_jobs_mutex;
 
 		std::vector<Pos<int>> chunks_to_remove;
         std::mutex chunks_to_remove_mutex;
@@ -88,8 +92,7 @@ export namespace craftbuild {
         none start_log_thread();
         none start_redstone_thread();
         none start_scheduler_thread();
-        none submit_terrain_jobs();
-        none submit_mesh_jobs();
+        none submit_jobs();
         bool should_render_face(ptr<Chunk> chunk, ptr<Chunk> neighbors[4], const Pos<int>& npos);
         ptr<Chunk> get_or_create_chunk(const Pos<int>& chunk_pos);
         none create_chunk_collision(ptr<Chunk> chunk, const PackedVector3Array& collision_faces);
@@ -101,8 +104,8 @@ export namespace craftbuild {
         uint32 get_global_block_id(int wx, int wy, int wz);
         none set_global_block_id(uint32 block_id, int wx, int wy, int wz);
 
-        none save_world(const std::string& path = "user://game/saves/My World/overworld.cbsave");
-        bool load_world(const std::string& path = "user://game/saves/My World/overworld.cbsave");
+        none save_world(const std::string& path);
+        bool load_world(const std::string& path);
 
         none save_userdata(const char* path = "user://game/userdata.cbdata");
         bool load_userdata(const char* path = "user://game/userdata.cbdata");
