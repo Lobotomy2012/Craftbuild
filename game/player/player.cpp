@@ -37,24 +37,20 @@ namespace craftbuild {
 
         log<LogType::INFO>(format{} << "Skin loaded: " << path);
 
-        MeshInstance3D* player_model = player.get_node<MeshInstance3D>("mesh");
-        if (player_model) {
-            apply_skin_to_model(player_model, skin_tex);
-        }
-        else {
-            log<LogType::WARNING>("Player model not found. Create a MeshInstance3D named 'Model'");
-        }
+        MeshInstance3D* player_model = player.get_node<MeshInstance3D>("Mesh");
+        if (player_model) apply_skin_to_model(player_model, skin_tex);
+        else log<LogType::WARNING>("Player model not found. Create a MeshInstance3D named 'Model'");
 
         return true;
     }
 
     none Player::_ready() {
         // Camera
-        camera = get_node<Camera3D>("camera");
+        camera = get_node<Camera3D>("Camera");
         camera->set_position(Vector3(0, 1.6f, 0));
 
         // Model
-        auto* model = get_node<MeshInstance3D>("mesh");
+        auto* model = get_node<MeshInstance3D>("Mesh");
 
         ref<BoxMesh> box = memnew(BoxMesh);
         box->set_size(Vector3(0.6f, 1.8f, 0.3f));
@@ -63,7 +59,7 @@ namespace craftbuild {
         model->set_position(Vector3(0, 0.9f, 0));
 
         // Collision
-        auto* collision = get_node<CollisionShape3D>("shape");
+        auto* collision = get_node<CollisionShape3D>("Shape");
 
         ref<CapsuleShape3D> capsule = memnew(CapsuleShape3D);
         capsule->set_radius(0.3f);
@@ -98,6 +94,7 @@ namespace craftbuild {
                 gamemode = (Gamemode)(((uint8_t)gamemode + 1) % 4);
                 log<LogType::INFO>(format{} << "Changed gamemode to " << (int)gamemode);
                 can_fly = false;
+                double_jump_armed = false;
                 gamemode_toggled = true;
             }
         }
@@ -114,16 +111,25 @@ namespace craftbuild {
 
         Vector3 velocity = get_velocity();
         Input* input = Input::get_singleton();
+        const bool jump_pressed = input->is_key_pressed(KEY_SPACE);
 
         // Gravity & Jump
         is_grounded = is_on_floor();
         if (not can_fly) {
             const float32 dt = static_cast<float32>(delta);
-            const bool jump_pressed = input->is_key_pressed(KEY_SPACE);
 
             if (is_grounded) {
                 if (velocity.y < 0.0f) velocity.y = -0.1f;
-                if (jump_pressed) velocity.y = jump_velocity;
+                if (not jump_pressed) double_jump_armed = false;
+                if (jump_pressed) {
+                    velocity.y = jump_velocity;
+                    double_jump_armed = gamemode == Gamemode::Creative;
+                }
+            }
+            else if (gamemode == Gamemode::Creative and double_jump_armed and jump_pressed and not jump_was_pressed) {
+                can_fly = not can_fly;
+                double_jump_armed = false;
+                velocity.y = 0.0f;
             }
             else velocity.y -= gravity * dt;
         }
@@ -131,7 +137,9 @@ namespace craftbuild {
             velocity.y = 0;
             if (input->is_key_pressed(KEY_SPACE)) velocity.y = speed;
             if (input->is_key_pressed(KEY_SHIFT)) velocity.y = -speed;
+            if (is_grounded) can_fly = false;
         }
+        jump_was_pressed = jump_pressed;
 
         Vector3 forward = -camera->get_global_transform().basis.get_column(2);
         Vector3 right = camera->get_global_transform().basis.get_column(0);

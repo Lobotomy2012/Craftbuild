@@ -44,7 +44,8 @@ export namespace craftbuild {
 
         ref<FastNoiseLite> noise;
         ref<ShaderMaterial> world_material;
-        std::atomic<int32> world_seed = 123456789;
+        std::atomic<int32> world_seed = 0;
+        std::string world_name = "My World";
 
         none* player_ptr = nullptr;
 
@@ -71,6 +72,8 @@ export namespace craftbuild {
         inline static const int SIZE_X = render_distance * 16;
         inline static const int SIZE_Z = render_distance * 16;
 
+        none init();
+
         none _ready() override;
         none _process(float64 delta) override;
         none _notification(int p_what);
@@ -93,14 +96,16 @@ export namespace craftbuild {
         uint32 get_global_block_id(int wx, int wy, int wz);
         none set_global_block_id(uint32 block_id, int wx, int wy, int wz);
 
-        none save_world(const char* path = "res://saves/overworld.cbsave");
-        bool load_world(const char* path = "res://saves/overworld.cbsave");
+        none save_world(const std::string& path = "res://saves/My World/overworld.cbsave");
+        bool load_world(const std::string& path = "res://saves/My World/overworld.cbsave");
 
         none save_userdata(const char* path = "res://userdata.cbdata");
         bool load_userdata(const char* path = "res://userdata.cbdata");
 
         none pause();
         none resume();
+
+        none set_seed_and_world_name(int32 seed, const String name);
 
         static none _bind_methods();
 

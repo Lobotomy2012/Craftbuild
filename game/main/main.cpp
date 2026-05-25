@@ -21,13 +21,14 @@ module;
 #include <shared_mutex>
 #include <chrono>
 #include <cstring>
+#include <random>
 
 module game.main;
 
 import game.player;
 
 namespace craftbuild {
-    none Main::_ready() {
+    none Main::init() {
         start_log_thread();
 
         TagRegistry::register_tag("face");
@@ -56,21 +57,26 @@ namespace craftbuild {
         BiomeRegistry::register_biome("Plains", plains);
         BiomeRegistry::register_biome("Mountains", mountains);
 
+        if (not load_userdata()) log<LogType::WARNING>("Userdata file not found.");
+        if (not load_world(format{} << "res://saves/" << world_name << "/overworld.cbsave")) {
+            log<LogType::WARNING>("Save file not found, starting new world.");
+            if (world_seed.load(std::memory_order_acquire) == 0) {
+                std::mt19937 generator;
+                std::uniform_int_distribution<int32> distribution;
+                world_seed.store(distribution(generator), std::memory_order_release);
+            }
+        }
         noise.instantiate();
         noise->set_noise_type(FastNoiseLite::TYPE_SIMPLEX);
         noise->set_frequency(0.0125f);
-        noise->set_seed(world_seed.load(std::memory_order_relaxed));
-        world_seed.store(static_cast<int32>(noise->get_seed()), std::memory_order_release);
+        noise->set_seed(world_seed.load(std::memory_order_acquire));
 
         AtlasTexture::build_texture_array();
         setup_voxel_material();
 
-        player_ptr = get_node<Player>("player");
+        player_ptr = get_node<Player>("Player");
 
         log<LogType::VERBOSE>("Assets loaded");
-
-        if (not load_userdata()) log<LogType::WARNING>("Userdata file not found.");
-        if (not load_world())    log<LogType::WARNING>("Save file not found, starting new world.");
 
         world_ready.store(true, std::memory_order_release);
         start_terrain_thread();
@@ -78,6 +84,10 @@ namespace craftbuild {
         start_redstone_thread();
 
         log<LogType::INFO>("Main initialized");
+    }
+
+    none Main::_ready() {
+        init();
     }
 
     none Main::_process(float64 delta) {
@@ -190,7 +200,8 @@ namespace craftbuild {
     }
 
     none Main::_notification(int p_what) {
-        if (p_what == NOTIFICATION_WM_CLOSE_REQUEST) save_world(); // Auto save
+        std::string file_name = format{} << "res://saves/" << world_name << "/overworld.cbsave";
+        if (p_what == NOTIFICATION_WM_CLOSE_REQUEST) save_world(file_name); // Auto save
         else if (p_what == NOTIFICATION_APPLICATION_FOCUS_OUT) emit_signal("pause");
         else if (p_what == NOTIFICATION_EXIT_TREE) {
 			running.store(false, std::memory_order_relaxed);
@@ -200,7 +211,7 @@ namespace craftbuild {
             if (redstone_thread.joinable()) redstone_thread.join();
             if (log_thread.joinable()) log_thread.join();
 
-            save_world();
+            save_world(file_name);
             save_userdata();
         }
     }
@@ -308,7 +319,7 @@ namespace craftbuild {
                     }
                 }
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                if (not (chunks_processed == 0)) std::this_thread::sleep_for(std::chrono::milliseconds(250));
             }
         };
 
@@ -705,8 +716,8 @@ namespace craftbuild {
         chunk.value().set_block({ (uint8)lx, (uint8)wy, (uint8)lz }, block_id);
     }
 
-    none Main::save_world(const char* path) {
-        String real_path = ProjectSettings::get_singleton()->globalize_path(path);
+    none Main::save_world(const std::string& path) {
+        String real_path = ProjectSettings::get_singleton()->globalize_path(path.c_str());
         std::string std_path = real_path.utf8().get_data();
 
         // Tạo thư mục
@@ -792,8 +803,8 @@ namespace craftbuild {
         log<LogType::VERBOSE>(format{} << chunk_count << " chunks");
     }
 
-    bool Main::load_world(const char* path) {
-        String real_path = ProjectSettings::get_singleton()->globalize_path(path);
+    bool Main::load_world(const std::string& path) {
+        String real_path = ProjectSettings::get_singleton()->globalize_path(path.c_str());
         std::string std_path = real_path.utf8().get_data();
 
         std::ifstream ifs(std_path, std::ios::binary);
@@ -888,7 +899,7 @@ namespace craftbuild {
             chunk.value().collision_built.store(false, std::memory_order_release);
         }
 
-        //player->load_data(ifs);
+        player->load_data(ifs);
 
         log<LogType::INFO>("World loaded successfully!");
         return true;
@@ -943,10 +954,17 @@ namespace craftbuild {
         pausing.store(false, std::memory_order_relaxed);
     }
 
+    none Main::set_seed_and_world_name(int32 seed, const String name) {
+        world_seed.store(seed, std::memory_order_release);
+        world_name = name.utf8();
+    }
+
     none Main::_bind_methods() {
         ADD_SIGNAL(MethodInfo("pause"));
         ADD_SIGNAL(MethodInfo("resume"));
+        ClassDB::bind_method(D_METHOD("init"), &Main::init);
         ClassDB::bind_method(D_METHOD("pause_game"), &Main::pause);
         ClassDB::bind_method(D_METHOD("resume_game"), &Main::resume);
+        ClassDB::bind_method(D_METHOD("set_seed_and_world_name", "seed", "name"), &Main::set_seed_and_world_name);
     }
 }

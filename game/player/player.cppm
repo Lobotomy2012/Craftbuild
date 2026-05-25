@@ -26,11 +26,13 @@ export namespace craftbuild {
 
     public:
         // Movement
-        float32 speed = 5.0f;
+        float32 speed = 4.0f;
         float32 gravity = 24.0f;
         float32 jump_velocity = 7.0f;
         bool is_grounded = false;
         bool can_fly = false;
+        bool jump_was_pressed = false;
+        bool double_jump_armed = false;
         bool running = false;
         Gamemode gamemode = Gamemode::Survival;
 
