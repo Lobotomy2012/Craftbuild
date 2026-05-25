@@ -1,0 +1,39 @@
+[gd_scene format=3 uid="uid://dhyco7doxuxx8"]
+
+[ext_resource type="Script" uid="uid://dei5rf5lgkf0x" path="res://assets/scripts/world_list/Worlds.gd" id="1_2i1tt"]
+[ext_resource type="Script" uid="uid://cuj5bjqqtekvb" path="res://assets/scripts/world_list/CreateBtn.gd" id="2_jq3ou"]
+[ext_resource type="Script" uid="uid://c4k7n8fquvnsp" path="res://assets/scripts/world_list/ExitBtn.gd" id="3_0ilop"]
+
+[node name="WorldList" type="Control" unique_id=504102342]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Worlds" type="VBoxContainer" parent="." unique_id=990709204]
+layout_mode = 0
+offset_left = 528.0
+offset_right = 1149.0
+offset_bottom = 648.0
+alignment = 1
+script = ExtResource("1_2i1tt")
+
+[node name="CreateBtn" type="Button" parent="." unique_id=482615447]
+layout_mode = 0
+offset_left = 2.0
+offset_top = 251.0
+offset_right = 436.0
+offset_bottom = 313.0
+text = "Create new World"
+script = ExtResource("2_jq3ou")
+
+[node name="ExitBtn" type="Button" parent="." unique_id=807444775]
+layout_mode = 0
+offset_left = 3.0
+offset_top = 327.0
+offset_right = 437.0
+offset_bottom = 403.0
+text = "Exit"
+script = ExtResource("3_0ilop")
