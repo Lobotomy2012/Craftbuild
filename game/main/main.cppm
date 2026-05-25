@@ -27,6 +27,7 @@ import game.core;
 import game.block;
 import game.logger;
 import game.thread;
+import game.environment;
 import game.world.chunk;
 import game.world.biome;
 import game.block.normal_blocks;

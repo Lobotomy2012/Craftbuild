@@ -10,6 +10,7 @@ module;
 #include <shared_mutex>
 #include <algorithm>
 #include <memory>
+#include <cmath>
 
 export module game.world.chunk;
 
@@ -66,6 +67,60 @@ export namespace craftbuild {
             h *= 0x846ca68bu;
             h ^= h >> 16;
             return h;
+        }
+
+        static float32 smoothstep(float32 value) {
+            value = std::clamp(value, 0.0f, 1.0f);
+            return value * value * (3.0f - 2.0f * value);
+        }
+
+        static Biome lerp_biome(const Biome& a, const Biome& b, float32 t) {
+            return {
+                a.base_noise + (b.base_noise - a.base_noise) * t,
+                a.base_height + (b.base_height - a.base_height) * t,
+                a.detail_noise + (b.detail_noise - a.detail_noise) * t,
+                a.detail_height + (b.detail_height - a.detail_height) * t,
+                a.temperature + (b.temperature - a.temperature) * t,
+                static_cast<int32>(std::round(static_cast<float32>(a.min_height) + static_cast<float32>(b.min_height - a.min_height) * t))
+            };
+        }
+
+        static Biome select_biome_at(int32 wx, int32 wz, ref<FastNoiseLite> noise, size biome_count) {
+            if (biome_count == 0) return { 0.01f, 40.0f, 0.4f, 4.0f, 60.0f, 0 };
+
+            const float32 biome_noise_val = noise->get_noise_2d(
+                static_cast<real_t>(wx + 10000) * 0.005f,
+                static_cast<real_t>(wz + 10000) * 0.005f
+            );
+            const float32 normalized = (biome_noise_val + 1.0f) * 0.5f;
+            const size biome_idx = std::clamp(static_cast<size>(normalized * biome_count), static_cast<size>(0), biome_count - 1);
+            return BiomeRegistry::get_biome(biome_idx);
+        }
+
+        static Biome get_blended_biome(int32 wx, int32 wz, ref<FastNoiseLite> noise, size biome_count) {
+            if (biome_count <= 1) return select_biome_at(wx, wz, noise, biome_count);
+
+            static constexpr int32 BLEND_CELL_SIZE = 96;
+            const float32 cell_xf = static_cast<float32>(wx) / static_cast<float32>(BLEND_CELL_SIZE);
+            const float32 cell_zf = static_cast<float32>(wz) / static_cast<float32>(BLEND_CELL_SIZE);
+            const int32 cell_x = static_cast<int32>(std::floor(cell_xf));
+            const int32 cell_z = static_cast<int32>(std::floor(cell_zf));
+            const float32 tx = smoothstep(cell_xf - static_cast<float32>(cell_x));
+            const float32 tz = smoothstep(cell_zf - static_cast<float32>(cell_z));
+
+            const int32 x0 = cell_x * BLEND_CELL_SIZE;
+            const int32 z0 = cell_z * BLEND_CELL_SIZE;
+            const int32 x1 = x0 + BLEND_CELL_SIZE;
+            const int32 z1 = z0 + BLEND_CELL_SIZE;
+
+            const Biome b00 = select_biome_at(x0, z0, noise, biome_count);
+            const Biome b10 = select_biome_at(x1, z0, noise, biome_count);
+            const Biome b01 = select_biome_at(x0, z1, noise, biome_count);
+            const Biome b11 = select_biome_at(x1, z1, noise, biome_count);
+
+            const Biome bx0 = lerp_biome(b00, b10, tx);
+            const Biome bx1 = lerp_biome(b01, b11, tx);
+            return lerp_biome(bx0, bx1, tz);
         }
 
         ~Chunk() {
@@ -210,26 +265,22 @@ export namespace craftbuild {
                 new_block_ids.emplace(local_id, block_id);
             };
 
-            size biome_count = BiomeRegistry::registry.size();
+            const size biome_count = BiomeRegistry::registry.size();
             for (uint8 x = 0; x < SIZE_X; ++x) {
                 for (uint8 z = 0; z < SIZE_Z; ++z) {
                     int32 global_x = chunk_pos.x * SIZE_X + x;
                     int32 global_z = chunk_pos.z * SIZE_Z + z;
 
-                    Biome current_biome = { 0.01f, 40.0f, 0.4f, 4.0f, 60.0f, 0.5f };
-                    if (biome_count > 0) {
-                        float32 biome_noise_val = noise->get_noise_2d(
-                            static_cast<real_t>(global_x + 10000) * 0.002f,
-                            static_cast<real_t>(global_z + 10000) * 0.002f
-                        );
-                        float32 normalized = (biome_noise_val + 1.0f) * 0.5f;
-                        size biome_idx = std::clamp(static_cast<size>(normalized * biome_count), static_cast<size>(0), biome_count - 1);
-                        current_biome = BiomeRegistry::get_biome(biome_idx);
-                    }
+                    const Biome current_biome = get_blended_biome(global_x, global_z, noise, biome_count);
 
                     float32 base_noise = noise->get_noise_2d(static_cast<real_t>(global_x) * current_biome.base_noise, static_cast<real_t>(global_z) * current_biome.base_noise);
                     float32 base_elevation = ((base_noise + 1.0f) * 0.5f) * current_biome.base_height;
-                    float32 terrain_base_y = current_biome.min_height + base_elevation;
+                    float32 detail_elevation = 0.0f;
+                    if (current_biome.detail_noise > 0.0f and current_biome.detail_height > 0.0f) {
+                        const float32 detail_noise = noise->get_noise_2d(static_cast<real_t>(global_x) * current_biome.detail_noise, static_cast<real_t>(global_z) * current_biome.detail_noise);
+                        detail_elevation = detail_noise * current_biome.detail_height;
+                    }
+                    float32 terrain_base_y = current_biome.min_height + base_elevation + detail_elevation;
 
                     int solid_depth = -1;
 

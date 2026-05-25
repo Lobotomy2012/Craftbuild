@@ -28,7 +28,7 @@ export namespace craftbuild {
         // Movement
         float32 speed = 4.0f;
         float32 gravity = 24.0f;
-        float32 jump_velocity = 7.0f;
+        float32 jump_velocity = 7.5f;
         bool is_grounded = false;
         bool can_fly = false;
         bool jump_was_pressed = false;
@@ -43,7 +43,7 @@ export namespace craftbuild {
 
         // Camera
         Camera3D* camera = nullptr;
-        float32 sensitivity = 0.004f;
+        float32 sensitivity = 0.0043f;
         float32 mouse_pitch = 0.0f;
 
         // World

@@ -6,6 +6,7 @@
 import misc.types;
 import misc.format;
 import game.core;
+import game.environment;
 import game.main;
 import game.player;
 import game.logger;
@@ -22,6 +23,8 @@ none initialize_module(ModuleInitializationLevel p_level) {
 
     ClassDB::register_class<Main>();
     ClassDB::register_class<Player>();
+    ClassDB::register_class<Sun>();
+    ClassDB::register_class<CraftSky>();
 }
 
 none uninitialize_module(ModuleInitializationLevel p_level) {

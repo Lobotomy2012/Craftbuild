@@ -16,14 +16,13 @@ namespace craftbuild {
         ref<StandardMaterial3D> mat;
         mat.instantiate();
         mat->set_texture(StandardMaterial3D::TEXTURE_ALBEDO, texture);
-        mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED); // Minecraft style
         mat->set_flag(StandardMaterial3D::FLAG_ALBEDO_TEXTURE_FORCE_SRGB, true);
         mat->set_transparency(StandardMaterial3D::TRANSPARENCY_ALPHA_DEPTH_PRE_PASS); // Support layer 2
         return mat;
     }
 
     none SkinManager::apply_skin_to_model(MeshInstance3D* model, ref<Texture2D> texture) {
-        if (!model) return;
+        if (not model) return;
 
         ref<StandardMaterial3D> mat = create_skin_material(texture);
         model->set_material_override(mat);

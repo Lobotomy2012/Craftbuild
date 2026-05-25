@@ -47,16 +47,16 @@ namespace craftbuild {
     none Player::_ready() {
         // Camera
         camera = get_node<Camera3D>("Camera");
-        camera->set_position(Vector3(0, 1.6f, 0));
+        camera->set_position(Vector3(0, 1.8f, 0));
 
         // Model
         auto* model = get_node<MeshInstance3D>("Mesh");
 
         ref<BoxMesh> box = memnew(BoxMesh);
-        box->set_size(Vector3(0.6f, 1.8f, 0.3f));
+        box->set_size(Vector3(0.6f, 2.0f, 0.3f));
 
         model->set_mesh(box);
-        model->set_position(Vector3(0, 0.9f, 0));
+        model->set_position(Vector3(0, 1.0f, 0));
 
         // Collision
         auto* collision = get_node<CollisionShape3D>("Shape");
@@ -66,7 +66,7 @@ namespace craftbuild {
         capsule->set_height(1.8f);
 
         collision->set_shape(capsule);
-        collision->set_position(Vector3(0, 0.9f, 0));
+        collision->set_position(Vector3(0, 1.0f, 0));
 
         // Load Skin
         SkinManager::load_skin(*this, "res://assets/textures/skin/creeper_boy.png");
@@ -74,7 +74,7 @@ namespace craftbuild {
 		// World reference
         world_ptr = Object::cast_to<Main>(get_parent());
 
-        hotbar = { 1, 2, 3, 4, 5, 0, 0, 0, 0 };
+        hotbar = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
         selected_slot = 0;
 
         log<LogType::INFO>("Player initialized");
@@ -201,9 +201,10 @@ namespace craftbuild {
                         uint32 target_block_id = world->get_global_block_id(break_block_pos.x, break_block_pos.y, break_block_pos.z);
 
                         log<LogType::INFO>(format{} << "Looking at block id: " << target_block_id << " at (" << break_block_pos.x << ", " << break_block_pos.y << ", " << break_block_pos.z << ")");
-                        
-                        if (left)  world->set_global_block_id(AIR, break_block_pos.x, break_block_pos.y, break_block_pos.z);
-                        if (right) world->set_global_block_id(get_selected_block_id(), break_block_pos.x, break_block_pos.y, break_block_pos.z);
+
+                        auto block = get_selected_block_id();
+                        if (left)                   world->set_global_block_id(AIR, break_block_pos.x, break_block_pos.y, break_block_pos.z);
+                        if (right and block != AIR) world->set_global_block_id(block, break_block_pos.x, break_block_pos.y, break_block_pos.z);
 
                         const int cx = static_cast<int>(std::floor((float32)break_block_pos.x / Chunk::SIZE_X));
                         const int cz = static_cast<int>(std::floor((float32)break_block_pos.z / Chunk::SIZE_Z));
@@ -213,15 +214,13 @@ namespace craftbuild {
                             chunk.value().collision_built.store(false, std::memory_order_release);
 
                             Pos<int> neighbor_offsets[4] = { {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1} };
-                            ptr<Chunk> neighbor = nullptr;
                             for (const auto& offset : neighbor_offsets) {
-                                if (neighbor = world->get_chunk(cx + offset.x, cz + offset.z)) break;
+                                if (auto neighbor = world->get_chunk(cx + offset.x, cz + offset.z)) {
+                                    neighbor.value().dirty.store(true, std::memory_order_release);
+                                    neighbor.value().mesh_ready.store(false, std::memory_order_release);
+                                    neighbor.value().collision_built.store(false, std::memory_order_release);
+                                }
                             }
-
-                            if (not neighbor) return;
-                            neighbor.value().dirty.store(true, std::memory_order_release);
-                            neighbor.value().mesh_ready.store(false, std::memory_order_release);
-                            neighbor.value().collision_built.store(false, std::memory_order_release);
                         }
                     }
                 }

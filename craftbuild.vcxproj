@@ -158,6 +158,7 @@
     <ClCompile Include="game\core.cppm" />
     <ClCompile Include="game\player\skin_manager.cpp" />
     <ClCompile Include="game\pos.cppm" />
+    <ClCompile Include="game\environment.cppm" />
     <ClCompile Include="game\texture\atlas_texture.cppm">
       <FileType>Document</FileType>
     </ClCompile>

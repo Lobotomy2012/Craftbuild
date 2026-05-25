@@ -12,6 +12,7 @@ module;
 #include <godot_cpp/classes/collision_shape3d.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
 #include <godot_cpp/classes/concave_polygon_shape3d.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 
 #include <includes.hpp>
 #include <cmath>
@@ -47,14 +48,22 @@ namespace craftbuild {
         plains.detail_noise = 0.2f;
         plains.min_height = 40;
 
+        Biome normal;
+        normal.base_height = 60.0f;
+        normal.base_noise = 0.05f;
+        normal.detail_height = 8.0f;
+        normal.detail_noise = 0.5f;
+        normal.min_height = 40;
+
         Biome mountains;
-        mountains.base_height = 60.0f;
-        mountains.base_noise = 0.05f;
-        mountains.detail_height = 8.0f;
-        mountains.detail_noise = 0.5f;
-        mountains.min_height = 20;
+        mountains.base_height = 140.0f;
+        mountains.base_noise = 0.02f;
+        mountains.detail_height = 35.0f;
+        mountains.detail_noise = 0.15f;
+        mountains.min_height = 40;
 
         BiomeRegistry::register_biome("Plains", plains);
+        BiomeRegistry::register_biome("Normal", normal);
         BiomeRegistry::register_biome("Mountains", mountains);
 
         if (not load_userdata()) log<LogType::WARNING>("Userdata file not found.");
@@ -73,6 +82,9 @@ namespace craftbuild {
 
         AtlasTexture::build_texture_array();
         setup_voxel_material();
+
+        if (not get_node_or_null(NodePath("Sun"))) add_child(memnew(Sun));
+        if (not get_node_or_null(NodePath("Sky"))) add_child(memnew(CraftSky));
 
         player_ptr = get_node<Player>("Player");
 
@@ -277,50 +289,84 @@ namespace craftbuild {
     none Main::start_terrain_thread() {
         if (terrain_thread.joinable()) return;
 
+        ThreadRegistry::register_thread("Terrain Thread");
+        log<LogType::INFO>("Terrain thread started");
+
         auto worker = [this]() {
-            ThreadRegistry::register_thread("Terrain Thread");
-            log<LogType::INFO>("Terrain thread started");
+            auto update_chunks = [this](bool _x, bool _z) {
+                while (running.load(std::memory_order_relaxed)) {
+                    const int px = (int)std::floor(player_x.load(std::memory_order_relaxed) / Chunk::SIZE_X);
+                    const int pz = (int)std::floor(player_z.load(std::memory_order_relaxed) / Chunk::SIZE_Z);
 
-            static constexpr int max_chunks_per_tick = 8;
-            while (running.load(std::memory_order_relaxed)) {
-                const int px = (int)std::floor(player_x.load(std::memory_order_relaxed) / Chunk::SIZE_X);
-                const int pz = (int)std::floor(player_z.load(std::memory_order_relaxed) / Chunk::SIZE_Z);
-                int chunks_processed = 0;
+                    bool chunk_processed = false;
+                    bool still_run = running.load(std::memory_order_relaxed);
+                    for (int r = 0; r <= render_distance and still_run; ++r) {
+                        int start_x = _x ? -r : 0;
+                        int end_x = not _x ? r : 0;
+                        int start_z = _z ? -r : 0;
+                        int end_z = not _z ? r : 0;
 
-                bool still_run = running.load(std::memory_order_relaxed);
-                for (int r = 0; r <= render_distance and still_run; ++r) {
-                    for (int x = -r; x <= r and still_run; ++x) {
-                        for (int z = -r; z <= r; ++z) {
-                            still_run = running.load(std::memory_order_relaxed);
-                            if (not still_run) break;
+                        for (int x = start_x; x <= end_x and still_run; ++x) {
+                            for (int z = start_z; z <= end_z; ++z) {
+                                still_run = running.load(std::memory_order_relaxed);
+                                if (not still_run) break;
 
-                            if (std::abs(x) == r or std::abs(z) == r) {
-                                if (chunks_processed >= max_chunks_per_tick) break;
+                                if (std::abs(x) == r or std::abs(z) == r) {
+                                    auto chunk = get_or_create_chunk({ px + x, 0, pz + z });
 
-                                auto chunk = get_or_create_chunk({ px + x, 0, pz + z });
+                                    if (not chunk.value().generated.load(std::memory_order_acquire)) {
+                                        chunk.value().generate_terrain(world_seed.load(std::memory_order_acquire), noise);
+                                        chunk.value().dirty.store(true, std::memory_order_release);
 
-                                if (not chunk.value().generated.load(std::memory_order_acquire)) {
-                                    chunk.value().generate_terrain(world_seed.load(std::memory_order_acquire), noise);
-                                    chunk.value().dirty.store(true, std::memory_order_release);
+                                        Pos<int> neighbor_offsets[4] = { {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1} };
 
-                                    Pos<int> neighbor_offsets[4] = { {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1} };
+                                        for (const auto& offset : neighbor_offsets) {
+                                            ptr<Chunk> neighbor = get_chunk(chunk.value().chunk_pos.x + offset.x, chunk.value().chunk_pos.z + offset.z);
 
-                                    for (const auto& offset : neighbor_offsets) {
-                                        ptr<Chunk> neighbor = get_chunk(chunk.value().chunk_pos.x + offset.x, chunk.value().chunk_pos.z + offset.z);
+                                            if (neighbor and neighbor.value().generated.load(std::memory_order_acquire))
+                                                neighbor.value().dirty.store(true, std::memory_order_release);
+                                        }
 
-                                        if (neighbor and neighbor.value().generated.load(std::memory_order_acquire))
-                                            neighbor.value().dirty.store(true, std::memory_order_release);
+                                        chunk_processed = true;
                                     }
-
-                                    ++chunks_processed;
                                 }
                             }
                         }
                     }
+                    
+                    if (chunk_processed) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                    else                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 }
+            };
+            
+            auto worker1 = [this, &update_chunks]() {
+                ThreadRegistry::register_thread("Terrain Thread 1");
+                log<LogType::VERBOSE>("Terrain thread 1 started");
 
-                if (chunks_processed == 0) std::this_thread::sleep_for(std::chrono::milliseconds(250));
-            }
+                update_chunks(false, false);
+            };
+            auto worker2 = [this, &update_chunks]() {
+                ThreadRegistry::register_thread("Terrain Thread 2");
+                log<LogType::VERBOSE>("Terrain thread 2 started");
+
+                update_chunks(true, false);
+            };
+            auto worker3 = [this, &update_chunks]() {
+                ThreadRegistry::register_thread("Terrain Thread 3");
+                log<LogType::VERBOSE>("Terrain thread 3 started");
+
+                update_chunks(true, true);
+            };
+
+            std::thread thread1(worker1);
+            std::thread thread2(worker2);
+            std::thread thread3(worker3);
+
+            update_chunks(false, true);
+
+            if (thread1.joinable()) thread1.join();
+            if (thread2.joinable()) thread2.join();
+            if (thread3.joinable()) thread3.join();
         };
 
         terrain_thread = std::thread(worker);
@@ -329,24 +375,24 @@ namespace craftbuild {
     none Main::start_mesh_thread() {
         if (mesh_thread.joinable()) return;
 
-        auto worker = [this]() {
-            ThreadRegistry::register_thread("Mesh Thread");
-            log<LogType::INFO>("Mesh thread started");
+        ThreadRegistry::register_thread("Mesh Thread");
+        log<LogType::INFO>("Mesh thread started");
 
+        auto worker = [this]() {
             static constexpr int max_chunks_per_tick = 8;
 
-            auto update_mesh = [this](bool min_x, bool max_x, bool min_z, bool max_z) {
+            auto update_mesh = [this](bool _x, bool _z) {
                 while (running.load(std::memory_order_relaxed)) {
                     const int px = (int)std::floor(player_x.load(std::memory_order_relaxed) / Chunk::SIZE_X);
                     const int pz = (int)std::floor(player_z.load(std::memory_order_relaxed) / Chunk::SIZE_Z);
-                    int chunks_processed = 0;
 
+                    bool chunk_processed = false;
                     bool still_run = running.load(std::memory_order_relaxed);
                     for (int r = 0; r <= render_distance and still_run; ++r) {
-                        int start_x = min_x ? -r : 0;
-                        int end_x = max_x ? r : 0;
-                        int start_z = min_z ? -r : 0;
-                        int end_z = max_z ? r : 0;
+                        int start_x = _x ? -r : 0;
+                        int end_x = not _x ? r : 0;
+                        int start_z = _z ? -r : 0;
+                        int end_z = not _z ? r : 0;
 
                         for (int x = start_x; x <= end_x and still_run; ++x) {
                             for (int z = start_z; z <= end_z; ++z) {
@@ -354,21 +400,20 @@ namespace craftbuild {
                                 if (not still_run) break;
 
                                 if (std::abs(x) == r or std::abs(z) == r) {
-                                    if (chunks_processed >= max_chunks_per_tick) break;
-
                                     auto chunk = get_chunk(px + x, pz + z);
                                     if (not chunk) continue;
 
                                     if (chunk.value().dirty.load(std::memory_order_acquire) and not chunk.value().mesh_ready.load(std::memory_order_acquire)) {
                                         generate_mesh(chunk);
-                                        ++chunks_processed;
+                                        chunk_processed = true;
                                     }
                                 }
                             }
                         }
                     }
 
-                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    if (chunk_processed) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                    else                 std::this_thread::sleep_for(std::chrono::milliseconds(250));
                 }
             };
 
@@ -376,25 +421,25 @@ namespace craftbuild {
                 ThreadRegistry::register_thread("Mesh Thread 1");
                 log<LogType::VERBOSE>("Mesh thread 1 started");
 
-                update_mesh(false, true, false, true);
+                update_mesh(false, false);
             };
             auto worker2 = [this, &update_mesh]() {
                 ThreadRegistry::register_thread("Mesh Thread 2");
                 log<LogType::VERBOSE>("Mesh thread 2 started");
 
-                update_mesh(true, true, false, true);
+                update_mesh(true, false);
             };
             auto worker3 = [this, &update_mesh]() {
                 ThreadRegistry::register_thread("Mesh Thread 3");
                 log<LogType::VERBOSE>("Mesh thread 3 started");
 
-                update_mesh(true, true, true, true);
+                update_mesh(true, true);
             };
             auto worker4 = [this, &update_mesh]() {
                 ThreadRegistry::register_thread("Mesh Thread 4");
                 log<LogType::VERBOSE>("Mesh thread 4 started");
 
-                update_mesh(false, true, true, true);
+                update_mesh(false, true);
             };
 
             std::thread thread1(worker1);
@@ -402,17 +447,12 @@ namespace craftbuild {
             std::thread thread3(worker3);
             std::thread thread4(worker4);
 
-            auto last_unload_time = std::chrono::steady_clock::now();
             while (running.load(std::memory_order_relaxed)) {
-                auto now = std::chrono::steady_clock::now();
-                if (std::chrono::duration_cast<std::chrono::seconds>(now - last_unload_time).count() >= 5) {
-                    const int px = (int)std::floor(player_x.load(std::memory_order_relaxed) / Chunk::SIZE_X);
-                    const int pz = (int)std::floor(player_z.load(std::memory_order_relaxed) / Chunk::SIZE_Z);
+                const int px = (int)std::floor(player_x.load(std::memory_order_relaxed) / Chunk::SIZE_X);
+                const int pz = (int)std::floor(player_z.load(std::memory_order_relaxed) / Chunk::SIZE_Z);
 
-                    unload_distant_chunks(px, pz);
-                    last_unload_time = now;
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                unload_distant_chunks(px, pz);
+                std::this_thread::sleep_for(std::chrono::seconds(5));
             }
             if (thread1.joinable()) thread1.join();
             if (thread2.joinable()) thread2.join();
