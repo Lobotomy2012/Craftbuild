@@ -18,8 +18,8 @@ albedo_texture_force_srgb = true
 size = Vector3(0.6, 2, 0.3)
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_kiw3p"]
-sky_top_color = Color(0, 0.75, 0.85, 1)
-sky_horizon_color = Color(0.35, 0.95, 1, 1)
+sky_top_color = Color(0, 0.85, 0.9, 1)
+sky_horizon_color = Color(0.45, 1, 1, 1)
 sky_curve = 0.18
 sky_energy_multiplier = 0.75
 ground_bottom_color = Color(0.08, 0.16, 0.18, 1)
@@ -89,8 +89,14 @@ offset_transform_position = Vector2(1, 0)
 text = "Leave"
 script = ExtResource("3_aug50")
 
+[node name="Panel" type="Panel" parent="." unique_id=688092735]
+offset_left = 550.0
+offset_top = 605.0
+offset_right = 590.0
+offset_bottom = 645.0
+
 [node name="Sun" type="Sun" parent="." unique_id=954182571]
-transform = Transform3D(0.73168886, 0.48448068, -0.47948915, 0, 0.70343584, 0.7107587, 0.6816388, -0.5200542, 0.5146961, 0, 0, 0)
+transform = Transform3D(0.73168886, 0.48483542, -0.47913045, 0, 0.7029096, 0.7112791, 0.6816388, -0.520435, 0.5143111, 0, 0, 0)
 light_color = Color(1, 0.93, 0.78, 1)
 light_energy = 1.2
 light_indirect_energy = 0.55
