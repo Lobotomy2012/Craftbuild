@@ -11,30 +11,55 @@ height = 1.8
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s0nni"]
 transparency = 4
-shading_mode = 0
 albedo_texture = ExtResource("1_78awf")
 albedo_texture_force_srgb = true
 
 [sub_resource type="BoxMesh" id="BoxMesh_aug50"]
-size = Vector3(0.6, 1.8, 0.3)
+size = Vector3(0.6, 2, 0.3)
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_kiw3p"]
+sky_top_color = Color(0, 0.75, 0.85, 1)
+sky_horizon_color = Color(0.35, 0.95, 1, 1)
+sky_curve = 0.18
+sky_energy_multiplier = 0.75
+ground_bottom_color = Color(0.08, 0.16, 0.18, 1)
+ground_horizon_color = Color(0.18, 0.3, 0.32, 1)
+ground_curve = 0.3
+ground_energy_multiplier = 0.18
+sun_angle_max = 14.0
+sun_curve = 0.08
+
+[sub_resource type="Sky" id="Sky_400sg"]
+sky_material = SubResource("ProceduralSkyMaterial_kiw3p")
+process_mode = 3
+
+[sub_resource type="Environment" id="Environment_g4kob"]
+background_mode = 2
+background_energy_multiplier = 0.7
+sky = SubResource("Sky_400sg")
+ambient_light_source = 3
+ambient_light_energy = 0.25
+reflected_light_source = 2
+tonemap_mode = 3
+tonemap_exposure = 0.85
 
 [node name="Main" type="Main" unique_id=1493251702]
 script = ExtResource("4_kiw3p")
 
 [node name="Player" type="Player" parent="." unique_id=2000336194]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.755501, 63.000984, 5.8268585)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.755501, 80.58629, 5.8268585)
 velocity = Vector3(0, 0, 5)
 
 [node name="Shape" type="CollisionShape3D" parent="Player" unique_id=1808141800]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 shape = SubResource("CapsuleShape3D_78awf")
 
 [node name="Camera" type="Camera3D" parent="Player" unique_id=282328567]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
 current = true
 
 [node name="Mesh" type="MeshInstance3D" parent="Player" unique_id=1273041936]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 material_override = SubResource("StandardMaterial3D_s0nni")
 mesh = SubResource("BoxMesh_aug50")
 
@@ -63,3 +88,14 @@ offset_bottom = 409.0
 offset_transform_position = Vector2(1, 0)
 text = "Leave"
 script = ExtResource("3_aug50")
+
+[node name="Sun" type="Sun" parent="." unique_id=954182571]
+transform = Transform3D(0.73168886, 0.48448068, -0.47948915, 0, 0.70343584, 0.7107587, 0.6816388, -0.5200542, 0.5146961, 0, 0, 0)
+light_color = Color(1, 0.93, 0.78, 1)
+light_energy = 1.2
+light_indirect_energy = 0.55
+shadow_enabled = true
+directional_shadow_max_distance = 512.0
+
+[node name="CraftSky" type="CraftSky" parent="." unique_id=117233425]
+environment = SubResource("Environment_g4kob")
