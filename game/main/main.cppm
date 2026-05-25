@@ -96,11 +96,11 @@ export namespace craftbuild {
         uint32 get_global_block_id(int wx, int wy, int wz);
         none set_global_block_id(uint32 block_id, int wx, int wy, int wz);
 
-        none save_world(const std::string& path = "res://saves/My World/overworld.cbsave");
-        bool load_world(const std::string& path = "res://saves/My World/overworld.cbsave");
+        none save_world(const std::string& path = "user://game/saves/My World/overworld.cbsave");
+        bool load_world(const std::string& path = "user://game/saves/My World/overworld.cbsave");
 
-        none save_userdata(const char* path = "res://userdata.cbdata");
-        bool load_userdata(const char* path = "res://userdata.cbdata");
+        none save_userdata(const char* path = "user://game/userdata.cbdata");
+        bool load_userdata(const char* path = "user://game/userdata.cbdata");
 
         none pause();
         none resume();

@@ -58,7 +58,7 @@ namespace craftbuild {
         BiomeRegistry::register_biome("Mountains", mountains);
 
         if (not load_userdata()) log<LogType::WARNING>("Userdata file not found.");
-        if (not load_world(format{} << "res://saves/" << world_name << "/overworld.cbsave")) {
+        if (not load_world(format{} << "user://game/saves/" << world_name << "/overworld.cbsave")) {
             log<LogType::WARNING>("Save file not found, starting new world.");
             if (world_seed.load(std::memory_order_acquire) == 0) {
                 std::mt19937 generator;
@@ -200,7 +200,7 @@ namespace craftbuild {
     }
 
     none Main::_notification(int p_what) {
-        std::string file_name = format{} << "res://saves/" << world_name << "/overworld.cbsave";
+        std::string file_name = format{} << "user://game/saves/" << world_name << "/overworld.cbsave";
         if (p_what == NOTIFICATION_WM_CLOSE_REQUEST) save_world(file_name); // Auto save
         else if (p_what == NOTIFICATION_APPLICATION_FOCUS_OUT) emit_signal("pause");
         else if (p_what == NOTIFICATION_EXIT_TREE) {
@@ -319,7 +319,7 @@ namespace craftbuild {
                     }
                 }
 
-                if (not (chunks_processed == 0)) std::this_thread::sleep_for(std::chrono::milliseconds(250));
+                if (chunks_processed == 0) std::this_thread::sleep_for(std::chrono::milliseconds(250));
             }
         };
 

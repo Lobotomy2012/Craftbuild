@@ -60,7 +60,7 @@ export namespace craftbuild {
 
             static auto log_file = []() {
                 const auto time = get_time();
-                const String real_path = ProjectSettings::get_singleton()->globalize_path(("res://logs/" + time2file_name(time) + ".txt").c_str());
+                const String real_path = ProjectSettings::get_singleton()->globalize_path(("user://game/logs/" + time2file_name(time) + ".txt").c_str());
                 const std::string std_path = real_path.utf8().get_data();
                 std::filesystem::create_directories(std::filesystem::path(std_path).parent_path());
                 return std::ofstream(std_path);
