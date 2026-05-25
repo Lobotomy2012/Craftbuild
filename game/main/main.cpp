@@ -91,9 +91,8 @@ namespace craftbuild {
         log<LogType::VERBOSE>("Assets loaded");
 
         world_ready.store(true, std::memory_order_release);
-        start_terrain_thread();
-        start_mesh_thread();
         start_redstone_thread();
+        start_scheduler_thread();
 
         log<LogType::INFO>("Main initialized");
     }
@@ -218,10 +217,10 @@ namespace craftbuild {
         else if (p_what == NOTIFICATION_EXIT_TREE) {
 			running.store(false, std::memory_order_relaxed);
 
-            if (terrain_thread.joinable()) terrain_thread.join();
-            if (mesh_thread.joinable()) mesh_thread.join();
-            if (redstone_thread.joinable()) redstone_thread.join();
             if (log_thread.joinable()) log_thread.join();
+            if (redstone_thread.joinable()) redstone_thread.join();
+            if (scheduler_thread.joinable()) scheduler_thread.join();
+            loop_cv.notify_all();
 
             save_world(file_name);
             save_userdata();
@@ -286,183 +285,6 @@ namespace craftbuild {
         log_thread = std::thread(worker);
     }
 
-    none Main::start_terrain_thread() {
-        if (terrain_thread.joinable()) return;
-
-        ThreadRegistry::register_thread("Terrain Thread");
-        log<LogType::INFO>("Terrain thread started");
-
-        auto worker = [this]() {
-            auto update_chunks = [this](bool _x, bool _z) {
-                while (running.load(std::memory_order_relaxed)) {
-                    const int px = (int)std::floor(player_x.load(std::memory_order_relaxed) / Chunk::SIZE_X);
-                    const int pz = (int)std::floor(player_z.load(std::memory_order_relaxed) / Chunk::SIZE_Z);
-
-                    bool chunk_processed = false;
-                    bool still_run = running.load(std::memory_order_relaxed);
-                    for (int r = 0; r <= render_distance and still_run; ++r) {
-                        int start_x = _x ? -r : 0;
-                        int end_x = not _x ? r : 0;
-                        int start_z = _z ? -r : 0;
-                        int end_z = not _z ? r : 0;
-
-                        for (int x = start_x; x <= end_x and still_run; ++x) {
-                            for (int z = start_z; z <= end_z; ++z) {
-                                still_run = running.load(std::memory_order_relaxed);
-                                if (not still_run) break;
-
-                                if (std::abs(x) == r or std::abs(z) == r) {
-                                    auto chunk = get_or_create_chunk({ px + x, 0, pz + z });
-
-                                    if (not chunk.value().generated.load(std::memory_order_acquire)) {
-                                        chunk.value().generate_terrain(world_seed.load(std::memory_order_acquire), noise);
-                                        chunk.value().dirty.store(true, std::memory_order_release);
-
-                                        Pos<int> neighbor_offsets[4] = { {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1} };
-
-                                        for (const auto& offset : neighbor_offsets) {
-                                            ptr<Chunk> neighbor = get_chunk(chunk.value().chunk_pos.x + offset.x, chunk.value().chunk_pos.z + offset.z);
-
-                                            if (neighbor and neighbor.value().generated.load(std::memory_order_acquire))
-                                                neighbor.value().dirty.store(true, std::memory_order_release);
-                                        }
-
-                                        chunk_processed = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (chunk_processed) std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                    else                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                }
-            };
-            
-            auto worker1 = [this, &update_chunks]() {
-                ThreadRegistry::register_thread("Terrain Thread 1");
-                log<LogType::VERBOSE>("Terrain thread 1 started");
-
-                update_chunks(false, false);
-            };
-            auto worker2 = [this, &update_chunks]() {
-                ThreadRegistry::register_thread("Terrain Thread 2");
-                log<LogType::VERBOSE>("Terrain thread 2 started");
-
-                update_chunks(true, false);
-            };
-            auto worker3 = [this, &update_chunks]() {
-                ThreadRegistry::register_thread("Terrain Thread 3");
-                log<LogType::VERBOSE>("Terrain thread 3 started");
-
-                update_chunks(true, true);
-            };
-
-            std::thread thread1(worker1);
-            std::thread thread2(worker2);
-            std::thread thread3(worker3);
-
-            update_chunks(false, true);
-
-            if (thread1.joinable()) thread1.join();
-            if (thread2.joinable()) thread2.join();
-            if (thread3.joinable()) thread3.join();
-        };
-
-        terrain_thread = std::thread(worker);
-    }
-
-    none Main::start_mesh_thread() {
-        if (mesh_thread.joinable()) return;
-
-        ThreadRegistry::register_thread("Mesh Thread");
-        log<LogType::INFO>("Mesh thread started");
-
-        auto worker = [this]() {
-            static constexpr int max_chunks_per_tick = 8;
-
-            auto update_mesh = [this](bool _x, bool _z) {
-                while (running.load(std::memory_order_relaxed)) {
-                    const int px = (int)std::floor(player_x.load(std::memory_order_relaxed) / Chunk::SIZE_X);
-                    const int pz = (int)std::floor(player_z.load(std::memory_order_relaxed) / Chunk::SIZE_Z);
-
-                    bool chunk_processed = false;
-                    bool still_run = running.load(std::memory_order_relaxed);
-                    for (int r = 0; r <= render_distance and still_run; ++r) {
-                        int start_x = _x ? -r : 0;
-                        int end_x = not _x ? r : 0;
-                        int start_z = _z ? -r : 0;
-                        int end_z = not _z ? r : 0;
-
-                        for (int x = start_x; x <= end_x and still_run; ++x) {
-                            for (int z = start_z; z <= end_z; ++z) {
-                                still_run = running.load(std::memory_order_relaxed);
-                                if (not still_run) break;
-
-                                if (std::abs(x) == r or std::abs(z) == r) {
-                                    auto chunk = get_chunk(px + x, pz + z);
-                                    if (not chunk) continue;
-
-                                    if (chunk.value().dirty.load(std::memory_order_acquire) and not chunk.value().mesh_ready.load(std::memory_order_acquire)) {
-                                        generate_mesh(chunk);
-                                        chunk_processed = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (chunk_processed) std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                    else                 std::this_thread::sleep_for(std::chrono::milliseconds(250));
-                }
-            };
-
-            auto worker1 = [this, &update_mesh]() {
-                ThreadRegistry::register_thread("Mesh Thread 1");
-                log<LogType::VERBOSE>("Mesh thread 1 started");
-
-                update_mesh(false, false);
-            };
-            auto worker2 = [this, &update_mesh]() {
-                ThreadRegistry::register_thread("Mesh Thread 2");
-                log<LogType::VERBOSE>("Mesh thread 2 started");
-
-                update_mesh(true, false);
-            };
-            auto worker3 = [this, &update_mesh]() {
-                ThreadRegistry::register_thread("Mesh Thread 3");
-                log<LogType::VERBOSE>("Mesh thread 3 started");
-
-                update_mesh(true, true);
-            };
-            auto worker4 = [this, &update_mesh]() {
-                ThreadRegistry::register_thread("Mesh Thread 4");
-                log<LogType::VERBOSE>("Mesh thread 4 started");
-
-                update_mesh(false, true);
-            };
-
-            std::thread thread1(worker1);
-            std::thread thread2(worker2);
-            std::thread thread3(worker3);
-            std::thread thread4(worker4);
-
-            while (running.load(std::memory_order_relaxed)) {
-                const int px = (int)std::floor(player_x.load(std::memory_order_relaxed) / Chunk::SIZE_X);
-                const int pz = (int)std::floor(player_z.load(std::memory_order_relaxed) / Chunk::SIZE_Z);
-
-                unload_distant_chunks(px, pz);
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-            }
-            if (thread1.joinable()) thread1.join();
-            if (thread2.joinable()) thread2.join();
-            if (thread3.joinable()) thread3.join();
-            if (thread4.joinable()) thread4.join();
-        };
-
-        mesh_thread = std::thread(worker);
-    }
-
     none Main::start_redstone_thread() {
         if (redstone_thread.joinable()) return;
 
@@ -476,6 +298,84 @@ namespace craftbuild {
         };
 
         redstone_thread = std::thread(worker);
+    }
+
+    none Main::start_scheduler_thread() {
+        scheduler_thread = std::thread([this]() {
+            ThreadRegistry::register_thread("Scheduler Thread");
+
+            auto last_unload_time = std::chrono::high_resolution_clock::now();
+            while (running.load()) {
+                submit_terrain_jobs();
+                submit_mesh_jobs();
+
+                auto now = std::chrono::high_resolution_clock::now();
+                if (std::chrono::duration_cast<std::chrono::seconds>(now - last_unload_time).count() >= 5) {
+                    unload_distant_chunks((int)(player_x.load() / Chunk::SIZE_X), (int)(player_z.load() / Chunk::SIZE_Z));
+                    last_unload_time = now;
+                }
+
+                std::unique_lock<std::mutex> lock(loop_mutex);
+                loop_cv.wait_for(lock, std::chrono::milliseconds(250));
+            }
+        });
+    }
+
+    none Main::submit_terrain_jobs() {
+        const int px = (int)std::floor(player_x.load() / Chunk::SIZE_X);
+        const int pz = (int)std::floor(player_z.load() / Chunk::SIZE_Z);
+
+        for (int r = 0; r <= render_distance; ++r) {
+            for (int x = -r; x <= r; ++x) {
+                for (int z = -r; z <= r; ++z) {
+                    if (std::abs(x) != r and std::abs(z) != r) continue;
+
+                    terrain_pool.enqueue([this, px, pz, x, z]() {
+                        if (not running.load()) return;
+
+                        auto chunk = get_or_create_chunk({ px + x, 0, pz + z });
+
+                        if (not chunk.value().generated.load(std::memory_order_acquire)) {
+                            chunk.value().generate_terrain(world_seed.load(), noise);
+                            chunk.value().dirty.store(true, std::memory_order_release);
+
+                            Pos<int> offsets[4] = { {1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1} };
+                            for (auto& o : offsets) {
+                                auto n = get_chunk(chunk.value().chunk_pos.x + o.x, chunk.value().chunk_pos.z + o.z);
+                                if (n and n.value().generated.load(std::memory_order_acquire)) n.value().dirty.store(true);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    none Main::submit_mesh_jobs() {
+        const int px = (int)std::floor(player_x.load() / Chunk::SIZE_X);
+        const int pz = (int)std::floor(player_z.load() / Chunk::SIZE_Z);
+
+        for (int r = 0; r <= render_distance; ++r) {
+            for (int x = -r; x <= r; ++x) {
+                for (int z = -r; z <= r; ++z) {
+                    if (std::abs(x) != r and std::abs(z) != r)continue;
+
+                    auto chunk = get_chunk(px + x, pz + z);
+                    if (not chunk) continue;
+
+                    mesh_pool.enqueue([this, chunk]() {
+                        if (not running.load(std::memory_order_relaxed)) return;
+
+                        if (chunk.value().dirty.load() and not chunk.value().mesh_ready.load()) {
+                            generate_mesh(chunk);
+
+                            chunk.value().mesh_ready.store(true);
+                            chunk.value().dirty.store(false);
+                        }
+                    });
+                }
+            }
+        }
     }
 
     bool Main::should_render_face(ptr<Chunk> chunk, ptr<Chunk> neighbors[4], const Pos<int>& npos) {

@@ -4,7 +4,7 @@ module;
 
 #include <includes.hpp>
 #include <concepts>
-#define VERSION "26.1"
+#define VERSION "26.3"
 
 export module game.core;
 

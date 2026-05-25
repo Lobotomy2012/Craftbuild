@@ -56,14 +56,17 @@ export namespace craftbuild {
         std::atomic<float32> player_y = 0;
         std::atomic<float32> player_z = 0;
         std::thread log_thread;
-        std::thread terrain_thread;
-        std::thread mesh_thread;
         std::thread redstone_thread;
+        std::thread scheduler_thread;
+        ThreadPool terrain_pool{ 4 };
+        ThreadPool mesh_pool{ 4 };
 
 		std::vector<Pos<int>> chunks_to_remove;
         std::mutex chunks_to_remove_mutex;
         std::atomic<bool> should_remove_chunks = false;
         std::atomic<bool> pausing = true;
+        std::mutex loop_mutex;
+        std::condition_variable loop_cv;
 
         bool full_screen = false;
 
@@ -83,9 +86,10 @@ export namespace craftbuild {
         none setup_voxel_material();
 
         none start_log_thread();
-        none start_terrain_thread();
-        none start_mesh_thread();
         none start_redstone_thread();
+        none start_scheduler_thread();
+        none submit_terrain_jobs();
+        none submit_mesh_jobs();
         bool should_render_face(ptr<Chunk> chunk, ptr<Chunk> neighbors[4], const Pos<int>& npos);
         ptr<Chunk> get_or_create_chunk(const Pos<int>& chunk_pos);
         none create_chunk_collision(ptr<Chunk> chunk, const PackedVector3Array& collision_faces);

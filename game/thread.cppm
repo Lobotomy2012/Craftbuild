@@ -3,6 +3,8 @@ module;
 #include <thread>
 #include <includes.hpp>
 #include <mutex>
+#include <functional>
+#include <queue>
 
 export module game.thread;
 
@@ -25,4 +27,53 @@ export namespace craftbuild {
 			return it->second;
 		}
 	};
+
+    class ThreadPool {
+        std::vector<std::thread> workers;
+        std::queue<std::function<void()>> tasks;
+
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool stop;
+
+    public:
+        ThreadPool(size_t n) : stop(false) {
+            for (size_t i = 0; i < n; ++i) {
+                workers.emplace_back([this]() {
+                    while (true) {
+                        std::function<void()> task;
+                        {
+                            std::unique_lock<std::mutex> lock(mutex);
+                            cv.wait(lock, [this] { return stop or not tasks.empty(); });
+
+                            if (stop and tasks.empty()) return;
+
+                            task = std::move(tasks.front());
+                            tasks.pop();
+                        }
+                        task();
+                    }
+                });
+            }
+        }
+
+        ~ThreadPool() {
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                stop = true;
+            }
+            cv.notify_all();
+
+            for (auto& w : workers) w.join();
+        }
+
+        template<class F>
+        void enqueue(F&& f) {
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                tasks.emplace(std::forward<F>(f));
+            }
+            cv.notify_one();
+        }
+    };
 }
