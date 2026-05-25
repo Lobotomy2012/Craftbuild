@@ -1,7 +1,7 @@
 extends VBoxContainer
 
 func _ready() -> void:
-	load_folders("res://saves")
+	load_folders("user://game/saves")
 	
 func create_button(world_name: String) -> void:
 	var btn = Button.new()
