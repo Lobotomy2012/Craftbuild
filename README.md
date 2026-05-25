@@ -5,15 +5,17 @@ A Minecraft likes Voxel game made with C++23 and Godot.
 Indev
 
 # Features
+- Enviroment
 - Generate terrain
 - Save/Load world
 - Collision, Camera, Skin
-- Break/Set block
-- Hotbar
+- Break block
 - Menu
 - Pause screen
 
 # Comming soon
+- Hotbar
+- Place block
 - Lighting system
 - Cloud
 - Weather
