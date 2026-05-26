@@ -7,6 +7,7 @@ func _ready() -> void:
 	
 func create_button(world_name: String) -> void:
 	var btn = Button.new()
+	btn.add_theme_font_size_override("font_size", 20)
 	btn.text = world_name
 	btn.pressed.connect(func(): 
 		Global.world_name = world_name

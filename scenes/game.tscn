@@ -63,40 +63,59 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 material_override = SubResource("StandardMaterial3D_s0nni")
 mesh = SubResource("BoxMesh_aug50")
 
-[node name="ResumeBtn" type="Button" parent="." unique_id=1180982376]
-offset_top = 245.0
-offset_right = 205.0
-offset_bottom = 292.0
-offset_transform_position = Vector2(1, 0)
-text = "Resume"
-script = ExtResource("2_s0nni")
-
 [node name="SettingBtn" type="Button" parent="." unique_id=1060459505]
-offset_left = 1.0
-offset_top = 304.0
-offset_right = 206.0
-offset_bottom = 351.0
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -73.5
+offset_right = 205.0
+offset_bottom = -26.5
+grow_vertical = 2
 offset_transform_position = Vector2(1, 0)
+theme_override_font_sizes/font_size = 20
 text = "Setting"
 script = ExtResource("2_s0nni")
 
-[node name="LeaveBtn" type="Button" parent="." unique_id=34333985]
-offset_left = 1.0
-offset_top = 362.0
-offset_right = 206.0
-offset_bottom = 409.0
+[node name="ResumeBtn" type="Button" parent="." unique_id=1180982376]
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -23.5
+offset_right = 205.0
+offset_bottom = 23.5
+grow_vertical = 2
 offset_transform_position = Vector2(1, 0)
+theme_override_font_sizes/font_size = 20
+text = "Resume"
+script = ExtResource("2_s0nni")
+
+[node name="LeaveBtn" type="Button" parent="." unique_id=34333985]
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = 26.5
+offset_right = 205.0
+offset_bottom = 73.5
+grow_vertical = 2
+offset_transform_position = Vector2(1, 0)
+theme_override_font_sizes/font_size = 20
 text = "Leave"
 script = ExtResource("3_aug50")
 
 [node name="Panel" type="Panel" parent="." unique_id=688092735]
-offset_left = 550.0
-offset_top = 605.0
-offset_right = 590.0
-offset_bottom = 645.0
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -28.0
+offset_top = -53.0
+offset_right = 28.0
+grow_horizontal = 2
+grow_vertical = 0
 
 [node name="Sun" type="Sun" parent="." unique_id=954182571]
-transform = Transform3D(0.73168886, 0.48483542, -0.47913045, 0, 0.7029096, 0.7112791, 0.6816388, -0.520435, 0.5143111, 0, 0, 0)
+transform = Transform3D(0.73168886, 0.4588999, -0.504026, 0, 0.7394327, 0.67323035, 0.6816388, -0.49259514, 0.54103464, 0, 0, 0)
 light_color = Color(1, 0.93, 0.78, 1)
 light_energy = 1.2
 light_indirect_energy = 0.55

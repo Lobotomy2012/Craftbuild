@@ -12,38 +12,60 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="WorldName" type="TextEdit" parent="." unique_id=1019060356]
-layout_mode = 0
-offset_left = 576.0
-offset_top = 214.0
-offset_right = 1152.0
-offset_bottom = 311.0
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -576.0
+offset_top = 1.5
+offset_bottom = 98.5
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 20
 text = "My World"
 placeholder_text = "My World"
 text_direction = 2
 
 [node name="Seed" type="TextEdit" parent="." unique_id=305080992]
-layout_mode = 0
-offset_left = 575.0
-offset_top = 341.0
-offset_right = 1151.0
-offset_bottom = 438.0
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -576.0
+offset_top = -99.5
+offset_bottom = -2.5
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 20
 placeholder_text = "Leave blank for random seed"
 text_direction = 2
 
 [node name="CreateBtn" type="Button" parent="." unique_id=918936424]
-layout_mode = 0
-offset_left = 2.0
-offset_top = 251.0
-offset_right = 436.0
-offset_bottom = 313.0
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -63.0
+offset_right = 434.0
+offset_bottom = -1.0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 20
 text = "Create new World"
 script = ExtResource("1_lt0dc")
 
 [node name="ExitBtn" type="Button" parent="." unique_id=1532229679]
-layout_mode = 0
-offset_left = 3.0
-offset_top = 327.0
-offset_right = 437.0
-offset_bottom = 403.0
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = 1.0
+offset_right = 434.0
+offset_bottom = 77.0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 20
 text = "Exit"
 script = ExtResource("2_ev1eq")
