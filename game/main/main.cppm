@@ -80,8 +80,6 @@ export namespace craftbuild {
         inline static const int SIZE_X = render_distance * 16;
         inline static const int SIZE_Z = render_distance * 16;
 
-        none init();
-
         none _ready() override;
         none _process(float64 delta) override;
         none _notification(int p_what);

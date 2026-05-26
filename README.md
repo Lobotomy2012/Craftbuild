@@ -1,3 +1,5 @@
+<img width="1717" height="916" alt="craftbuild" src="https://github.com/user-attachments/assets/0b83a353-046e-427b-b10b-e7ff6a83c5cb" />
+
 # Craftbuild
 A Minecraft likes Voxel game made with C++23 and Godot.
 

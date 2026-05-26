@@ -29,7 +29,7 @@ module game.main;
 import game.player;
 
 namespace craftbuild {
-    none Main::init() {
+    none Main::_ready() {
         start_log_thread();
 
         TagRegistry::register_tag("face");
@@ -95,10 +95,6 @@ namespace craftbuild {
         start_scheduler_thread();
 
         log<LogType::INFO>("Main initialized");
-    }
-
-    none Main::_ready() {
-        init();
     }
 
     none Main::_process(float64 delta) {
@@ -779,7 +775,7 @@ namespace craftbuild {
     none Main::_bind_methods() {
         ADD_SIGNAL(MethodInfo("pause"));
         ADD_SIGNAL(MethodInfo("resume"));
-        ClassDB::bind_method(D_METHOD("init"), &Main::init);
+        ClassDB::bind_method(D_METHOD("init"), &Main::_ready);
         ClassDB::bind_method(D_METHOD("pause_game"), &Main::pause);
         ClassDB::bind_method(D_METHOD("resume_game"), &Main::resume);
         ClassDB::bind_method(D_METHOD("set_seed_and_world_name", "seed", "name"), &Main::set_seed_and_world_name);
