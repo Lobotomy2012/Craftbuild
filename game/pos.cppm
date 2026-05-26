@@ -11,6 +11,11 @@ import misc.types;
 
 using namespace godot;
 
+template<typename T1, typename T2>
+concept AbleToCast = requires (T2 t2) {
+    (T1)t2;
+};
+
 export namespace craftbuild {
     template <typename T>
     requires std::is_arithmetic_v<T>
@@ -21,6 +26,9 @@ export namespace craftbuild {
         Pos(T x, T y, T z) : x(x), y(y), z(z) {}
         Pos(const Vector3& v) : x(v.x), y(v.y), z(v.z) {}
         Pos(const Vector3i& v) : x(v.x), y(v.y), z(v.z) {}
+        template<typename T2>
+        requires AbleToCast<T, T2>
+        Pos(const Pos<T2>& pos) : x((T)pos.x), y((T)pos.y), z((T)pos.z) {}
 
 #define def_operator(op) Pos& operator##op##=(const Pos& other) { x op##= other.x, y op##= other.y, z op##= other.z; return *this;}
 

@@ -34,7 +34,17 @@ export namespace craftbuild {
         std::vector<Pos<real>> collision_faces;
     };
 
-    struct Chunk {
+    struct FaceMask {
+        int layer = -1;
+        bool back_face = false;
+
+        bool operator==(const FaceMask& other) const {
+            return layer == other.layer and back_face == other.back_face;
+        }
+    };
+
+    class Chunk {
+    public:
         inline static constexpr uint8 SIZE_X = 16;
         inline static constexpr uint8 SIZE_Y = 255;
         inline static constexpr uint8 SIZE_Z = 16;
@@ -57,6 +67,13 @@ export namespace craftbuild {
         mutable std::mutex mesh_mutex;
         mutable std::shared_mutex data_mutex;
 
+        ~Chunk() {
+            std::lock_guard lock(mesh_mutex);
+            if (pending_mesh_data) {
+                pending_mesh_data.clear();
+            }
+        }
+
         static uint32 column_seed(int32 seed, int32 x, int32 z) {
             uint32 h = static_cast<uint32>(seed);
             h ^= static_cast<uint32>(x) + 0x9e3779b9u + (h << 6) + (h >> 2);
@@ -76,11 +93,11 @@ export namespace craftbuild {
 
         static Biome lerp_biome(const Biome& a, const Biome& b, float32 t) {
             return {
-                a.base_noise + (b.base_noise - a.base_noise) * t,
-                a.base_height + (b.base_height - a.base_height) * t,
-                a.detail_noise + (b.detail_noise - a.detail_noise) * t,
+                a.base_noise    + (b.base_noise - a.base_noise)       * t,
+                a.base_height   + (b.base_height - a.base_height)     * t,
+                a.detail_noise  + (b.detail_noise - a.detail_noise)   * t,
                 a.detail_height + (b.detail_height - a.detail_height) * t,
-                a.temperature + (b.temperature - a.temperature) * t,
+                a.temperature   + (b.temperature - a.temperature)     * t,
                 static_cast<int32>(std::round(static_cast<float32>(a.min_height) + static_cast<float32>(b.min_height - a.min_height) * t))
             };
         }
@@ -121,13 +138,6 @@ export namespace craftbuild {
             const Biome bx0 = lerp_biome(b00, b10, tx);
             const Biome bx1 = lerp_biome(b01, b11, tx);
             return lerp_biome(bx0, bx1, tz);
-        }
-
-        ~Chunk() {
-            std::lock_guard lock(mesh_mutex);
-            if (pending_mesh_data) {
-                pending_mesh_data.clear();
-            }
         }
 
         none set_block(const Pos<uint8>& pos, const std::string& block) {
@@ -327,6 +337,222 @@ export namespace craftbuild {
 
             generated.store(true, std::memory_order_release);
             dirty.store(true, std::memory_order_release);
+        }
+
+        none generate_mesh(ptr<Chunk> neighbors[4]) {
+            ptr<MeshData> data = new MeshData();
+            auto& vertices = data.value().vertices;
+            auto& normals = data.value().normals;
+            auto& indices = data.value().indices;
+            auto& uvs = data.value().uvs;
+            auto& uvs_layer = data.value().uvs_layer;
+            auto& collision_faces = data.value().collision_faces;
+
+            const uint32 AIR = BlockRegistry::get_id("Air");
+            const uint32 TRANSPARENT = TagRegistry::get_id("transparent");
+
+            vertices.reserve(4096);
+            normals.reserve(4096);
+            uvs.reserve(4096);
+            uvs_layer.reserve(4096);
+            indices.reserve(6144);
+            collision_faces.reserve(6144);
+
+            std::vector<std::shared_mutex*> mutexes_to_lock;
+            mutexes_to_lock.push_back(&data_mutex);
+            for (int i = 0; i < 4; ++i) if (neighbors[i]) mutexes_to_lock.push_back(&neighbors[i].value().data_mutex);
+
+            std::sort(mutexes_to_lock.begin(), mutexes_to_lock.end());
+            mutexes_to_lock.erase(std::unique(mutexes_to_lock.begin(), mutexes_to_lock.end()), mutexes_to_lock.end());
+
+            std::vector<std::unique_ptr<std::shared_lock<std::shared_mutex>>> locks;
+            for (auto* m : mutexes_to_lock) locks.push_back(std::make_unique<std::shared_lock<std::shared_mutex>>(*m));
+
+            dirty.store(false, std::memory_order_release);
+
+            auto transparent_or_air = [&](int bx, int by, int bz) -> bool {
+                if (by < 0 or by >= Chunk::SIZE_Y) return true;
+
+                uint32 id = AIR;
+                std::pair<uint32, uint16> tag = { TRANSPARENT, true };
+
+                if (bx >= Chunk::SIZE_X or bx < 0 or bz >= Chunk::SIZE_Z or bz < 0) {
+                    uint8 nid = 0;
+                    if (bx >= Chunk::SIZE_X)      nid = 0;
+                    else if (bx < 0)              nid = 1;
+                    else if (bz >= Chunk::SIZE_Z) nid = 2;
+                    else if (bz < 0)              nid = 3;
+
+                    ptr<Chunk> neighbor = neighbors[nid];
+                    if (not neighbor or not neighbor.value().generated.load(std::memory_order_acquire)) return true;
+
+                    uint8 lx = (uint8)((bx % Chunk::SIZE_X + Chunk::SIZE_X) % Chunk::SIZE_X);
+                    uint8 lz = (uint8)((bz % Chunk::SIZE_Z + Chunk::SIZE_Z) % Chunk::SIZE_Z);
+
+                    id = neighbor.value().get_block<false>({ lx, (uint8)by, lz });
+                    tag = neighbor.value().get_tag<false>({ lx, (uint8)by, lz });
+                }
+                else {
+                    id = get_block<false>({ (uint8)bx, (uint8)by, (uint8)bz });
+                    tag = get_tag<false>({ (uint8)bx, (uint8)by, (uint8)bz });
+                }
+
+                if (id == AIR) return true;
+                if (tag.first == TRANSPARENT) {
+                    const auto& transparent_tags = TagRegistry::get_value(TRANSPARENT);
+                    if (tag.second < transparent_tags.size()) return transparent_tags[tag.second] == true;
+                }
+                return false;
+            };
+
+            auto get_block_layer = [&](int bx, int by, int bz, Face face) -> int {
+                uint32 id = get_block<false>({ (uint8)bx, (uint8)by, (uint8)bz });
+                if (id == AIR) return -1;
+                ptr<Block> block = BlockRegistry::get_block(id);
+                if (not block) return -1;
+                return block.value().get_texture_layer(face);
+            };
+
+            const int64 dims[3] = { Chunk::SIZE_X, Chunk::SIZE_Y, Chunk::SIZE_Z };
+            const Face front_faces[3] = { Face::RIGHT, Face::TOP,    Face::FRONT };
+            const Face back_faces[3] =  { Face::LEFT,  Face::BOTTOM, Face::BACK  };
+
+            uint64 vertex_offset = 0;
+            for (int d = 0; d < 3; ++d) {
+                const int u = (d + 1) % 3;
+                const int v = (d + 2) % 3;
+
+                int64 x[3] = { 0, 0, 0 };
+                int64 q[3] = { 0, 0, 0 };
+                q[d] = 1;
+
+                for (x[d] = -1; x[d] < dims[d]; ++x[d]) {
+                    std::vector<FaceMask> mask(dims[u] * dims[v]);
+
+                    for (x[v] = 0; x[v] < dims[v]; ++x[v]) {
+                        for (x[u] = 0; x[u] < dims[u]; ++x[u]) {
+                            const bool a_inside = (x[d] >= 0);
+                            const bool b_inside = (x[d] + 1 < dims[d]);
+
+                            const bool a_trans = transparent_or_air(x[0], x[1], x[2]);
+                            const bool b_trans = transparent_or_air(x[0] + q[0], x[1] + q[1], x[2] + q[2]);
+                            
+                            if (a_inside and (not a_trans) and b_trans) {
+                                int layer = get_block_layer(x[0], x[1], x[2], front_faces[d]);
+                                if (layer >= 0) mask[x[u] + x[v] * dims[u]] = { layer, false };
+                            }
+                            else if (b_inside and a_trans and (not b_trans)) {
+                                int layer = get_block_layer(x[0] + q[0], x[1] + q[1], x[2] + q[2], back_faces[d]);
+                                if (layer >= 0) mask[x[u] + x[v] * dims[u]] = {layer, true};
+                            }
+                        }
+                    }
+
+                    for (int64 j = 0; j < dims[v]; ++j) {
+                        for (int64 i = 0; i < dims[u]; ) {
+                            FaceMask current_face = mask[i + j * dims[u]];
+                            if (current_face.layer < 0) {
+                                ++i;
+                                continue;
+                            }
+
+                            int width = 1;
+                            while (i + width < dims[u] and mask[(i + width) + j * dims[u]] == current_face) width++;
+
+                            int height = 1;
+                            bool can_grow = true;
+                            while (j + height < dims[v]) {
+                                for (int k = 0; k < width; ++k) {
+                                    if (not (mask[(i + k) + (j + height) * dims[u]] == current_face)) {
+                                        can_grow = false;
+                                        break;
+                                    }
+                                }
+                                if (not can_grow) break;
+                                ++height;
+                            }
+
+                            float32 du[3] = { 0, 0, 0 }; du[u] = (float32)width;
+                            float32 dv[3] = { 0, 0, 0 }; dv[v] = (float32)height;
+
+                            float32 start[3] = { 0, 0, 0 };
+                            start[d] = (float32)(x[d] + 1);
+                            start[u] = (float32)i;
+                            start[v] = (float32)j;
+
+                            Pos<float32> p0(start[0], start[1], start[2]);
+                            Pos<float32> p1(start[0] + du[0], start[1] + du[1], start[2] + du[2]);
+                            Pos<float32> p2(start[0] + du[0] + dv[0], start[1] + du[1] + dv[1], start[2] + du[2] + dv[2]);
+                            Pos<float32> p3(start[0] + dv[0], start[1] + dv[1], start[2] + dv[2]);
+
+                            auto get_uv = [&](const Pos<float32>& p) -> Vector2 {
+                                const float32 dx = p.x - p0.x;
+                                const float32 dy = p.y - p0.y;
+                                const float32 dz = p.z - p0.z;
+
+                                if (d == 0)      return Vector2(current_face.back_face ? height - dz : dz, width - dy);
+                                else if (d == 1) return Vector2(dx, current_face.back_face ? height - dz : dz);
+                                else             return Vector2(current_face.back_face ? width - dx : dx, height -dy);
+                            };
+
+                            if (not current_face.back_face) {
+                                vertices.push_back(p0); vertices.push_back(p1);
+                                vertices.push_back(p2); vertices.push_back(p3);
+
+                                uvs.push_back(get_uv(p0));
+                                uvs.push_back(get_uv(p1));
+                                uvs.push_back(get_uv(p2));
+                                uvs.push_back(get_uv(p3));
+                            }
+                            else {
+                                vertices.push_back(p0); vertices.push_back(p3);
+                                vertices.push_back(p2); vertices.push_back(p1);
+
+                                uvs.push_back(get_uv(p0));
+                                uvs.push_back(get_uv(p3));
+                                uvs.push_back(get_uv(p2));
+                                uvs.push_back(get_uv(p1));
+                            }
+
+                            Vector3 normal(0, 0, 0);
+                            if      (d == 0) normal.x = current_face.back_face ? -1.0f : 1.0f;
+                            else if (d == 1) normal.y = current_face.back_face ? -1.0f : 1.0f;
+                            else if (d == 2) normal.z = current_face.back_face ? -1.0f : 1.0f;
+
+                            for (int n = 0; n < 4; ++n) normals.push_back(normal);
+
+                            Vector2 layer_uv(static_cast<float>(current_face.layer), 0.0f);
+                            for (int n = 0; n < 4; ++n) uvs_layer.push_back(layer_uv);
+
+                            indices.push_back(vertex_offset + 0); indices.push_back(vertex_offset + 2); indices.push_back(vertex_offset + 1);
+                            indices.push_back(vertex_offset + 0); indices.push_back(vertex_offset + 3); indices.push_back(vertex_offset + 2);
+
+                            collision_faces.push_back(vertices[vertex_offset + 0]);
+                            collision_faces.push_back(vertices[vertex_offset + 2]);
+                            collision_faces.push_back(vertices[vertex_offset + 1]);
+                            collision_faces.push_back(vertices[vertex_offset + 0]);
+                            collision_faces.push_back(vertices[vertex_offset + 3]);
+                            collision_faces.push_back(vertices[vertex_offset + 2]);
+
+                            vertex_offset += 4;
+
+                            for (int v_idx = 0; v_idx < height; ++v_idx)
+                                for (int u_idx = 0; u_idx < width; ++u_idx)
+                                    mask[(i + u_idx) + (j + v_idx) * dims[u]] = { -1, false };
+
+                            i += width;
+                        }
+                    }
+                }
+            }
+
+            {
+                std::lock_guard lock(mesh_mutex);
+                pending_mesh_data = data;
+            }
+
+            mesh_ready.store(true, std::memory_order_release);
+            dirty.store(false, std::memory_order_release);
         }
     };
 }

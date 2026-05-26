@@ -93,10 +93,8 @@ export namespace craftbuild {
         none start_redstone_thread();
         none start_scheduler_thread();
         none submit_jobs();
-        bool should_render_face(ptr<Chunk> chunk, ptr<Chunk> neighbors[4], const Pos<int>& npos);
         ptr<Chunk> get_or_create_chunk(const Pos<int>& chunk_pos);
         none create_chunk_collision(ptr<Chunk> chunk, const PackedVector3Array& collision_faces);
-        none generate_mesh(ptr<Chunk> chunk);
         none update_chunk_mesh(ptr<Chunk> chunk, ref<ArrayMesh> mesh, PackedVector3Array& collision_faces);
         none unload_distant_chunks(int p_cx, int p_cz);
 

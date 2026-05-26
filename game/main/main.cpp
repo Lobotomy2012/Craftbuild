@@ -244,8 +244,9 @@ namespace craftbuild {
         shader->set_code(R"(
             shader_type spatial;
             render_mode cull_back, depth_draw_opaque, diffuse_burley;
-        
-            uniform sampler2DArray u_texture_array : source_color, filter_nearest;
+
+            uniform sampler2DArray u_texture_array : source_color, filter_linear_mipmap;
+
             varying float v_layer;
 
             void vertex() {
@@ -253,10 +254,13 @@ namespace craftbuild {
             }
 
             void fragment() {
-                vec4 tex = texture(u_texture_array, vec3(UV, v_layer));
+                vec3 uvw = vec3(UV, v_layer);
+                vec4 tex = texture(u_texture_array, uvw);
+
                 if (tex.a < 0.1) {
                     discard;
                 }
+
                 ALBEDO = tex.rgb;
             }
         )");
@@ -372,11 +376,18 @@ namespace craftbuild {
 
                     mesh_pool.enqueue([this, chunk, chunk_pos]() {
                         if (running.load(std::memory_order_relaxed)) {
-                            if (chunk.value().dirty.load() and not chunk.value().mesh_ready.load()) {
-                                generate_mesh(chunk);
+                            auto& _chunk = chunk.value();
+                            if (_chunk.dirty.load() or _chunk.mesh_ready.load()) {
+                                ptr<Chunk> neighbors[4] = {
+                                    get_chunk(_chunk.chunk_pos.x + 1, _chunk.chunk_pos.z),
+                                    get_chunk(_chunk.chunk_pos.x - 1, _chunk.chunk_pos.z),
+                                    get_chunk(_chunk.chunk_pos.x, _chunk.chunk_pos.z + 1),
+                                    get_chunk(_chunk.chunk_pos.x, _chunk.chunk_pos.z - 1)
+                                };
 
-                                chunk.value().mesh_ready.store(true);
-                                chunk.value().dirty.store(false);
+                                _chunk.generate_mesh(neighbors);
+                                _chunk.mesh_ready.store(true);
+                                _chunk.dirty.store(false);
                             }
                         }
 
@@ -388,49 +399,6 @@ namespace craftbuild {
                 }
             }
         }
-    }
-
-    bool Main::should_render_face(ptr<Chunk> chunk, ptr<Chunk> neighbors[4], const Pos<int>& npos) {
-        if (npos.y < 0 or npos.y >= Chunk::SIZE_Y) return true;
-
-        const auto& AIR = BlockRegistry::get_id("Air");
-        const auto& TRANSPARENT = TagRegistry::get_id("transparent");
-
-        uint32 neighbor_id = AIR;
-        std::pair<uint32, uint16> neighbor_tag = std::make_pair(TRANSPARENT, 0);
-
-        if (npos.x >= Chunk::SIZE_X or npos.x < 0 or npos.z >= Chunk::SIZE_Z or npos.z < 0) {
-            uint8 nid = 0;
-
-            if (npos.x >= Chunk::SIZE_X)      nid = 0;
-            else if (npos.x < 0)              nid = 1;
-            else if (npos.z >= Chunk::SIZE_Z) nid = 2;
-            else if (npos.z < 0)              nid = 3;
-
-            auto neighbor = neighbors[nid];
-            if (not neighbor or not neighbor.value().generated.load(std::memory_order_acquire)) return true;
-
-            if (neighbor) {
-                uint8 lx = (uint8)((npos.x % Chunk::SIZE_X + Chunk::SIZE_X) % Chunk::SIZE_X);
-                uint8 lz = (uint8)((npos.z % Chunk::SIZE_Z + Chunk::SIZE_Z) % Chunk::SIZE_Z);
-
-                neighbor_id = neighbor.value().get_block<false>({ lx, (uint8)npos.y, lz });
-                neighbor_tag = neighbor.value().get_tag<false>({ lx, (uint8)npos.y, lz });
-            }
-        }
-        else if (chunk) {
-            neighbor_id = chunk.value().get_block<false>({ (uint8)npos.x, (uint8)npos.y, (uint8)npos.z });
-            neighbor_tag = chunk.value().get_tag<false>({ (uint8)npos.x, (uint8)npos.y, (uint8)npos.z });
-        }
-
-        if (neighbor_id == AIR) return true;
-
-        if (neighbor_tag.first == TRANSPARENT) {
-            const auto& transparent_tags = TagRegistry::get_value(TRANSPARENT);
-            if (neighbor_tag.second < transparent_tags.size())
-                return transparent_tags[neighbor_tag.second] == true;
-        }
-        return false;
     }
 
     ptr<Chunk> Main::get_or_create_chunk(const Pos<int>& chunk_pos) {
@@ -483,111 +451,6 @@ namespace craftbuild {
 
         chunk.value().mesh_instance->add_child(static_body);
         chunk.value().collision_built.store(true, std::memory_order_release);
-    }
-
-    none Main::generate_mesh(ptr<Chunk> chunk) {
-        if (not chunk) return;
-
-		ptr<MeshData> data = new MeshData();
-        auto& vertices        = data.value().vertices;
-        auto& normals         = data.value().normals;
-        auto& indices         = data.value().indices;
-        auto& uvs             = data.value().uvs;
-        auto& uvs_layer       = data.value().uvs_layer;
-        auto& collision_faces = data.value().collision_faces;
-
-        const uint32 AIR = BlockRegistry::get_id("Air");
-        const uint32 TRANSPARENT = TagRegistry::get_id("transparent");
-
-        vertices.reserve(24576);
-        normals.reserve(24576);
-        uvs.reserve(24576);
-        uvs_layer.reserve(24576);
-        indices.reserve(36864);
-        collision_faces.reserve(36864);
-
-        const Vector3 dirs[6] = { {0,1,0},{0,-1,0},{1,0,0},{-1,0,0},{0,0,1},{0,0,-1} };
-        const Face faces[6] = { Face::TOP, Face::BOTTOM, Face::RIGHT, Face::LEFT, Face::FRONT, Face::BACK };
-
-        ptr<Chunk> neighbors[4] = {
-            get_chunk(chunk.value().chunk_pos.x + 1, chunk.value().chunk_pos.z),
-            get_chunk(chunk.value().chunk_pos.x - 1, chunk.value().chunk_pos.z),
-            get_chunk(chunk.value().chunk_pos.x, chunk.value().chunk_pos.z + 1),
-            get_chunk(chunk.value().chunk_pos.x, chunk.value().chunk_pos.z - 1)
-        };
-
-        std::vector<std::shared_mutex*> mutexes_to_lock;
-        mutexes_to_lock.push_back(&chunk.value().data_mutex);
-        for (int i = 0; i < 4; ++i) if (neighbors[i]) mutexes_to_lock.push_back(&neighbors[i].value().data_mutex);
-
-        std::sort(mutexes_to_lock.begin(), mutexes_to_lock.end());
-        mutexes_to_lock.erase(std::unique(mutexes_to_lock.begin(), mutexes_to_lock.end()), mutexes_to_lock.end());
-
-        std::vector<std::unique_ptr<std::shared_lock<std::shared_mutex>>> locks;
-        for (auto* m : mutexes_to_lock) locks.push_back(std::make_unique<std::shared_lock<std::shared_mutex>>(*m));
-
-        chunk.value().dirty.store(false, std::memory_order_release);
-
-        uint64 vertex_offset = 0;
-        const float32 py = player_y.load(std::memory_order_relaxed);
-
-        for (uint8 x = 0; x < Chunk::SIZE_X; ++x) {
-            for (uint8 y = 0; y < Chunk::SIZE_Y; ++y) {
-                for (uint8 z = 0; z < Chunk::SIZE_Z; ++z) {
-                    uint32 id = chunk.value().get_block<false>({ x, y, z });
-                    if (id == AIR) continue;
-
-                    ptr<Block> block = BlockRegistry::get_block(id);
-                    if (not block) continue;
-
-                    Pos<float32> pos(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
-
-                    for (int d = 0; d < 6; ++d) {
-                        Pos<int> npos(x + (int)dirs[d].x, y + (int)dirs[d].y, z + (int)dirs[d].z);
-
-                        if (not should_render_face(chunk, neighbors, npos)) continue;
-
-                        Block::create_face(faces[d], pos, vertices);
-
-                        Pos<float32> normal = dirs[d];
-                        for (int i = 0; i < 4; ++i) normals.push_back(normal);
-
-                        uvs.emplace_back(0, 0);
-                        uvs.emplace_back(1, 0);
-                        uvs.emplace_back(1, 1);
-                        uvs.emplace_back(0, 1);
-
-                        int layer = block.value().get_texture_layer(faces[d]);
-                        Vector2 layer_uv(static_cast<float>(layer), 0.0f);
-                        for (int i = 0; i < 4; ++i) uvs_layer.push_back(layer_uv);
-
-                        indices.push_back(vertex_offset + 0);
-                        indices.push_back(vertex_offset + 2);
-                        indices.push_back(vertex_offset + 1);
-                        indices.push_back(vertex_offset + 0);
-                        indices.push_back(vertex_offset + 3);
-                        indices.push_back(vertex_offset + 2);
-
-                        collision_faces.push_back(vertices[vertex_offset + 0]);
-                        collision_faces.push_back(vertices[vertex_offset + 2]);
-                        collision_faces.push_back(vertices[vertex_offset + 1]);
-                        collision_faces.push_back(vertices[vertex_offset + 0]);
-                        collision_faces.push_back(vertices[vertex_offset + 3]);
-                        collision_faces.push_back(vertices[vertex_offset + 2]);
-
-                        vertex_offset += 4;
-                    }
-                }
-            }
-        }
-
-        {
-            std::lock_guard lock(chunk.value().mesh_mutex);
-            chunk.value().pending_mesh_data = data;
-        }
-
-        chunk.value().mesh_ready.store(true, std::memory_order_release);
-        chunk.value().dirty.store(false, std::memory_order_release);
     }
     
     none Main::update_chunk_mesh(ptr<Chunk> chunk, ref<ArrayMesh> mesh, PackedVector3Array& collision_faces) {
@@ -876,6 +739,7 @@ namespace craftbuild {
         ofs.write(reinterpret_cast<const byte*>(&full_screen), sizeof(bool));
         ofs.write(reinterpret_cast<const byte*>(&player->sensitivity), sizeof(float32));
         ofs.write(reinterpret_cast<const byte*>(&player->mouse_pitch), sizeof(float32));
+        ofs.write(reinterpret_cast<const byte*>(&render_distance), sizeof(int));
     }
 
     bool Main::load_userdata(const char* path) {
@@ -891,6 +755,7 @@ namespace craftbuild {
         ifs.read(reinterpret_cast<byte*>(&full_screen), sizeof(bool));
         ifs.read(reinterpret_cast<byte*>(&player->sensitivity), sizeof(float32));
         ifs.read(reinterpret_cast<byte*>(&player->mouse_pitch), sizeof(float32));
+        ifs.read(reinterpret_cast<byte*>(&render_distance), sizeof(int));
 
         return true;
     }

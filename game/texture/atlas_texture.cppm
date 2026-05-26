@@ -14,7 +14,7 @@ import game.logger;
 using namespace godot;
 
 export namespace craftbuild {
-    inline uint8 IMAGE_SIZE = 16;
+    inline uint8 IMAGE_SIZE = 128;
 
 	struct AtlasTexture {
 		inline static ref<Texture2DArray> atlas_texture;
