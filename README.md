@@ -12,6 +12,8 @@ Indev
 - Break block
 - Menu
 - Pause screen
+- Multi-threading
+- Greedy meshing, texture LOD
 
 # Comming soon
 - Hotbar
