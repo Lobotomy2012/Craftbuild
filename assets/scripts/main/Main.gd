@@ -6,6 +6,7 @@ extends Main
 
 func _ready() -> void:
 	set_seed_and_world_name(Global.world_seed, Global.world_name)
+	set_render_distance(int(Global.render_distance))
 	pause.connect(_on_pause)
 	resume.connect(_on_resume)
 	init()

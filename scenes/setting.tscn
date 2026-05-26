@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://ciqriflss5liq"]
 
 [ext_resource type="Script" uid="uid://c4k7n8fquvnsp" path="res://assets/scripts/ExitBtn.gd" id="1_t1vjc"]
+[ext_resource type="Script" uid="uid://bwwolh1p2xo0x" path="res://assets/scripts/setting/RenderDistance.gd" id="2_u58eq"]
 
 [node name="Setting" type="Control" unique_id=661553886]
 layout_mode = 3
@@ -22,3 +23,34 @@ grow_vertical = 2
 theme_override_font_sizes/font_size = 20
 text = "Exit"
 script = ExtResource("1_t1vjc")
+
+[node name="RenderDistance" type="HSlider" parent="." unique_id=611122167]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -434.0
+offset_top = -8.0
+offset_bottom = 8.0
+grow_horizontal = 0
+grow_vertical = 2
+min_value = 4.0
+max_value = 64.0
+value = 4.0
+rounded = true
+script = ExtResource("2_u58eq")
+
+[node name="Name" type="Label" parent="RenderDistance" unique_id=1435085479]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -126.0
+offset_top = -24.5
+offset_bottom = -1.5
+grow_horizontal = 0
+grow_vertical = 2
+text = "Render distance: 32"

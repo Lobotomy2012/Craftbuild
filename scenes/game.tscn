@@ -5,20 +5,21 @@
 [ext_resource type="Script" uid="uid://tkffwo1ryjxb" path="res://assets/scripts/main/ResumeBtn.gd" id="3_u5sy4"]
 [ext_resource type="Script" uid="uid://cxmuhw4grh6rf" path="res://assets/scripts/SettingBtn.gd" id="4_gee14"]
 [ext_resource type="Script" uid="uid://c0ceo8cbu6ogd" path="res://assets/scripts/main/LeaveBtn.gd" id="5_0tnpc"]
+[ext_resource type="Texture2D" uid="uid://c1bmb8ftneuq8" path="res://assets/crosshair.png" id="6_p57ef"]
 
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_iywne"]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_u5sy4"]
 radius = 0.3
 height = 1.8
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p57ef"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gee14"]
 transparency = 4
 albedo_texture = ExtResource("2_p57ef")
 albedo_texture_force_srgb = true
 
-[sub_resource type="BoxMesh" id="BoxMesh_u5sy4"]
+[sub_resource type="BoxMesh" id="BoxMesh_0tnpc"]
 size = Vector3(0.6, 2, 0.3)
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_gee14"]
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_vtaks"]
 sky_top_color = Color(0, 0.85, 0.9, 1)
 sky_horizon_color = Color(0.45, 1, 1, 1)
 sky_curve = 0.18
@@ -30,14 +31,14 @@ ground_energy_multiplier = 0.18
 sun_angle_max = 14.0
 sun_curve = 0.08
 
-[sub_resource type="Sky" id="Sky_0tnpc"]
-sky_material = SubResource("ProceduralSkyMaterial_gee14")
+[sub_resource type="Sky" id="Sky_kvpfn"]
+sky_material = SubResource("ProceduralSkyMaterial_vtaks")
 process_mode = 3
 
-[sub_resource type="Environment" id="Environment_vtaks"]
+[sub_resource type="Environment" id="Environment_dinhu"]
 background_mode = 2
 background_energy_multiplier = 0.7
-sky = SubResource("Sky_0tnpc")
+sky = SubResource("Sky_kvpfn")
 ambient_light_source = 3
 ambient_light_energy = 0.25
 reflected_light_source = 2
@@ -53,7 +54,7 @@ velocity = Vector3(0, 0, 5)
 
 [node name="Shape" type="CollisionShape3D" parent="Player" unique_id=1808141800]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-shape = SubResource("CapsuleShape3D_iywne")
+shape = SubResource("CapsuleShape3D_u5sy4")
 
 [node name="Camera" type="Camera3D" parent="Player" unique_id=282328567]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
@@ -61,8 +62,8 @@ current = true
 
 [node name="Mesh" type="MeshInstance3D" parent="Player" unique_id=1273041936]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-material_override = SubResource("StandardMaterial3D_p57ef")
-mesh = SubResource("BoxMesh_u5sy4")
+material_override = SubResource("StandardMaterial3D_gee14")
+mesh = SubResource("BoxMesh_0tnpc")
 
 [node name="ResumeBtn" type="Button" parent="." unique_id=1180982376]
 anchors_preset = 4
@@ -116,7 +117,7 @@ grow_horizontal = 2
 grow_vertical = 0
 
 [node name="Sun" type="Sun" parent="." unique_id=954182571]
-transform = Transform3D(0.73168886, 0.4835389, -0.4804388, 0, 0.70482904, 0.70937705, 0.6816388, -0.51904327, 0.51571554, 0, 0, 0)
+transform = Transform3D(0.73168886, 0.47785723, -0.48609024, 0, 0.71312, 0.7010418, 0.6816388, -0.5129444, 0.521782, 0, 0, 0)
 light_color = Color(1, 0.93, 0.78, 1)
 light_energy = 1.2
 light_indirect_energy = 0.55
@@ -124,4 +125,18 @@ shadow_enabled = true
 directional_shadow_max_distance = 512.0
 
 [node name="CraftSky" type="CraftSky" parent="." unique_id=117233425]
-environment = SubResource("Environment_vtaks")
+environment = SubResource("Environment_dinhu")
+
+[node name="Crosshair" type="TextureRect" parent="." unique_id=171843478]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("6_p57ef")
