@@ -75,10 +75,10 @@ export namespace craftbuild {
         bool full_screen = false;
 
     public:
-        inline static int render_distance = 32;
+        inline static int32 render_distance = 32;
 
-        inline static const int SIZE_X = render_distance * 16;
-        inline static const int SIZE_Z = render_distance * 16;
+        inline static const int32 SIZE_X = render_distance * 16;
+        inline static const int32 SIZE_Z = render_distance * 16;
 
         none _ready() override;
         none _process(float64 delta) override;
@@ -110,6 +110,7 @@ export namespace craftbuild {
         none resume();
 
         none set_seed_and_world_name(int32 seed, const String name);
+        none set_render_distance(int32 rd);
 
         static none _bind_methods();
 

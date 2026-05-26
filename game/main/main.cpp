@@ -772,6 +772,10 @@ namespace craftbuild {
         world_name = name.utf8();
     }
 
+    none Main::set_render_distance(int32 rd) {
+        render_distance = rd;
+    }
+
     none Main::_bind_methods() {
         ADD_SIGNAL(MethodInfo("pause"));
         ADD_SIGNAL(MethodInfo("resume"));
@@ -779,5 +783,6 @@ namespace craftbuild {
         ClassDB::bind_method(D_METHOD("pause_game"), &Main::pause);
         ClassDB::bind_method(D_METHOD("resume_game"), &Main::resume);
         ClassDB::bind_method(D_METHOD("set_seed_and_world_name", "seed", "name"), &Main::set_seed_and_world_name);
+        ClassDB::bind_method(D_METHOD("set_render_distance", "rd"), &Main::set_render_distance);
     }
 }
