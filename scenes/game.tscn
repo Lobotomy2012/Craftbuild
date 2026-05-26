@@ -1,23 +1,24 @@
 [gd_scene format=3 uid="uid://d3smrgb72m8sy"]
 
-[ext_resource type="Texture2D" uid="uid://cr636nlqo7j20" path="res://assets/textures/skin/creeper_boy.png" id="1_78awf"]
-[ext_resource type="Script" uid="uid://tkffwo1ryjxb" path="res://assets/scripts/main/ResumeBtn.gd" id="2_s0nni"]
-[ext_resource type="Script" uid="uid://c0ceo8cbu6ogd" path="res://assets/scripts/main/LeaveBtn.gd" id="3_aug50"]
-[ext_resource type="Script" uid="uid://rfbej7xfj0am" path="res://assets/scripts/main/Main.gd" id="4_kiw3p"]
+[ext_resource type="Script" uid="uid://rfbej7xfj0am" path="res://assets/scripts/main/Main.gd" id="1_iywne"]
+[ext_resource type="Texture2D" uid="uid://cr636nlqo7j20" path="res://assets/textures/skin/creeper_boy.png" id="2_p57ef"]
+[ext_resource type="Script" uid="uid://tkffwo1ryjxb" path="res://assets/scripts/main/ResumeBtn.gd" id="3_u5sy4"]
+[ext_resource type="Script" uid="uid://cxmuhw4grh6rf" path="res://assets/scripts/SettingBtn.gd" id="4_gee14"]
+[ext_resource type="Script" uid="uid://c0ceo8cbu6ogd" path="res://assets/scripts/main/LeaveBtn.gd" id="5_0tnpc"]
 
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_78awf"]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_iywne"]
 radius = 0.3
 height = 1.8
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s0nni"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p57ef"]
 transparency = 4
-albedo_texture = ExtResource("1_78awf")
+albedo_texture = ExtResource("2_p57ef")
 albedo_texture_force_srgb = true
 
-[sub_resource type="BoxMesh" id="BoxMesh_aug50"]
+[sub_resource type="BoxMesh" id="BoxMesh_u5sy4"]
 size = Vector3(0.6, 2, 0.3)
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_kiw3p"]
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_gee14"]
 sky_top_color = Color(0, 0.85, 0.9, 1)
 sky_horizon_color = Color(0.45, 1, 1, 1)
 sky_curve = 0.18
@@ -29,14 +30,14 @@ ground_energy_multiplier = 0.18
 sun_angle_max = 14.0
 sun_curve = 0.08
 
-[sub_resource type="Sky" id="Sky_400sg"]
-sky_material = SubResource("ProceduralSkyMaterial_kiw3p")
+[sub_resource type="Sky" id="Sky_0tnpc"]
+sky_material = SubResource("ProceduralSkyMaterial_gee14")
 process_mode = 3
 
-[sub_resource type="Environment" id="Environment_g4kob"]
+[sub_resource type="Environment" id="Environment_vtaks"]
 background_mode = 2
 background_energy_multiplier = 0.7
-sky = SubResource("Sky_400sg")
+sky = SubResource("Sky_0tnpc")
 ambient_light_source = 3
 ambient_light_energy = 0.25
 reflected_light_source = 2
@@ -44,7 +45,7 @@ tonemap_mode = 3
 tonemap_exposure = 0.85
 
 [node name="Main" type="Main" unique_id=1493251702]
-script = ExtResource("4_kiw3p")
+script = ExtResource("1_iywne")
 
 [node name="Player" type="Player" parent="." unique_id=2000336194]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.755501, 80.58629, 5.8268585)
@@ -52,7 +53,7 @@ velocity = Vector3(0, 0, 5)
 
 [node name="Shape" type="CollisionShape3D" parent="Player" unique_id=1808141800]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-shape = SubResource("CapsuleShape3D_78awf")
+shape = SubResource("CapsuleShape3D_iywne")
 
 [node name="Camera" type="Camera3D" parent="Player" unique_id=282328567]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
@@ -60,10 +61,10 @@ current = true
 
 [node name="Mesh" type="MeshInstance3D" parent="Player" unique_id=1273041936]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
-material_override = SubResource("StandardMaterial3D_s0nni")
-mesh = SubResource("BoxMesh_aug50")
+material_override = SubResource("StandardMaterial3D_p57ef")
+mesh = SubResource("BoxMesh_u5sy4")
 
-[node name="SettingBtn" type="Button" parent="." unique_id=1060459505]
+[node name="ResumeBtn" type="Button" parent="." unique_id=1180982376]
 anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
@@ -73,10 +74,10 @@ offset_bottom = -26.5
 grow_vertical = 2
 offset_transform_position = Vector2(1, 0)
 theme_override_font_sizes/font_size = 20
-text = "Setting"
-script = ExtResource("2_s0nni")
+text = "Resume"
+script = ExtResource("3_u5sy4")
 
-[node name="ResumeBtn" type="Button" parent="." unique_id=1180982376]
+[node name="SettingBtn" type="Button" parent="." unique_id=1060459505]
 anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
@@ -86,8 +87,8 @@ offset_bottom = 23.5
 grow_vertical = 2
 offset_transform_position = Vector2(1, 0)
 theme_override_font_sizes/font_size = 20
-text = "Resume"
-script = ExtResource("2_s0nni")
+text = "Setting"
+script = ExtResource("4_gee14")
 
 [node name="LeaveBtn" type="Button" parent="." unique_id=34333985]
 anchors_preset = 4
@@ -100,7 +101,7 @@ grow_vertical = 2
 offset_transform_position = Vector2(1, 0)
 theme_override_font_sizes/font_size = 20
 text = "Leave"
-script = ExtResource("3_aug50")
+script = ExtResource("5_0tnpc")
 
 [node name="Panel" type="Panel" parent="." unique_id=688092735]
 anchors_preset = 7
@@ -115,7 +116,7 @@ grow_horizontal = 2
 grow_vertical = 0
 
 [node name="Sun" type="Sun" parent="." unique_id=954182571]
-transform = Transform3D(0.73168886, 0.4588999, -0.504026, 0, 0.7394327, 0.67323035, 0.6816388, -0.49259514, 0.54103464, 0, 0, 0)
+transform = Transform3D(0.73168886, 0.4835389, -0.4804388, 0, 0.70482904, 0.70937705, 0.6816388, -0.51904327, 0.51571554, 0, 0, 0)
 light_color = Color(1, 0.93, 0.78, 1)
 light_energy = 1.2
 light_indirect_energy = 0.55
@@ -123,4 +124,4 @@ shadow_enabled = true
 directional_shadow_max_distance = 512.0
 
 [node name="CraftSky" type="CraftSky" parent="." unique_id=117233425]
-environment = SubResource("Environment_g4kob")
+environment = SubResource("Environment_vtaks")

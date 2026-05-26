@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dei5rf5lgkf0x" path="res://assets/scripts/world_list/Worlds.gd" id="1_2i1tt"]
 [ext_resource type="Script" uid="uid://cuj5bjqqtekvb" path="res://assets/scripts/world_list/CreateBtn.gd" id="2_jq3ou"]
-[ext_resource type="Script" uid="uid://c4k7n8fquvnsp" path="res://assets/scripts/world_list/ExitBtn.gd" id="3_0ilop"]
+[ext_resource type="Script" uid="uid://c4k7n8fquvnsp" path="res://assets/scripts/ExitBtn.gd" id="3_0ilop"]
 
 [node name="WorldList" type="Control" unique_id=504102342]
 layout_mode = 3

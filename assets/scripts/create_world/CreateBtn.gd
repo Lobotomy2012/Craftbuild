@@ -3,8 +3,7 @@ extends Button
 func _ready() -> void:
 	pressed.connect(_on_pressed)
 	var dir = DirAccess.open(Global.world_saves)
-	if dir == null:
-		return
+	if dir == null: return
 		
 	dir.list_dir_begin()
 	var folder_name = dir.get_next()
@@ -18,11 +17,11 @@ func _ready() -> void:
 	if (i > 1): $"../WorldName".text = "My World " + str(i)
 
 func _on_pressed():
-	if not check_name(Global.world_name):
-		return
+	if not check_name(Global.world_name): return
+	
 	Global.world_name = $"../WorldName".text
 	Global.world_seed = int($"../Seed".text)
-	get_tree().change_scene_to_file("res://scenes/Game.tscn")
+	Global.go_to("res://scenes/game.tscn")
 	
 func check_name(world_name: String) -> bool:
 	var targets = ["\\", "/", ":", "*", "?", "\"", "<", ">", "|"]
