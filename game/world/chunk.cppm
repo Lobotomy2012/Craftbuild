@@ -15,7 +15,9 @@ module;
 export module game.world.chunk;
 
 import misc.ptr;
-import misc.types;
+import misc.str;
+import misc.dict;
+import misc.interger;
 import game.pos;
 import game.block;
 import game.logger;
@@ -49,9 +51,9 @@ export namespace craftbuild {
         inline static constexpr uint8 SIZE_Y = 255;
         inline static constexpr uint8 SIZE_Z = 16;
 
-        std::unordered_map<uint8, uint32> block_ids;
-        std::unordered_map<uint8, std::pair<uint32, uint16>> tag_ids;
-        std::unordered_map<Pos<uint8>, BlockStorageFull, PosHash<uint8>> complex_blocks;
+        Dict<uint8, uint32> block_ids;
+        Dict<uint8, std::pair<uint32, uint16>> tag_ids;
+        Dict<Pos<uint8>, BlockStorageFull> complex_blocks;
         BlockStorage blocks[SIZE_X][SIZE_Y][SIZE_Z] = {};
 
         MeshInstance3D* mesh_instance = nullptr;
@@ -140,7 +142,7 @@ export namespace craftbuild {
             return lerp_biome(bx0, bx1, tz);
         }
 
-        none set_block(const Pos<uint8>& pos, const std::string& block) {
+        none set_block(const Pos<uint8>& pos, const Str& block) {
 			set_block(pos, BlockRegistry::get_id(block));
         }
         none set_block(const Pos<uint8>& pos, uint32 block_id) {
@@ -162,7 +164,7 @@ export namespace craftbuild {
             block_ids.emplace(block_ids.size(), block_id);
         }
 
-        none tag_block(const Pos<uint8>& pos, const std::string& tag, uint16 tag_data = 0) {
+        none tag_block(const Pos<uint8>& pos, const Str& tag, uint16 tag_data = 0) {
             tag_block(pos, TagRegistry::get_id(tag), tag_data);
         }
         none tag_block(const Pos<uint8>& pos, uint32 tag_id, uint16 tag_data = 0) {
@@ -184,7 +186,7 @@ export namespace craftbuild {
             tag_ids.emplace(tag_ids.size(), std::make_pair(tag_id, (uint16)0));
         }
 
-        bool has_tag(const Pos<uint8>& pos, const std::string& tag) const {
+        bool has_tag(const Pos<uint8>& pos, const Str& tag) const {
 			return has_tag(pos, TagRegistry::get_id(tag));
         }
         bool has_tag(const Pos<uint8>& pos, uint32 tag_id) const {
@@ -252,9 +254,9 @@ export namespace craftbuild {
             const uint32 BEDROCK = BlockRegistry::get_id("Bedrock");
 
             auto new_blocks = std::make_unique<BlockStorage[][SIZE_Y][SIZE_Z]>(SIZE_X);
-            std::unordered_map<uint8, uint32> new_block_ids;
-            std::unordered_map<uint8, std::pair<uint32, uint16>> new_tag_ids;
-            std::unordered_map<Pos<uint8>, BlockStorageFull, PosHash<uint8>> new_complex_blocks;
+            Dict<uint8, uint32> new_block_ids;
+            Dict<uint8, std::pair<uint32, uint16>> new_tag_ids;
+            Dict<Pos<uint8>, BlockStorageFull> new_complex_blocks;
 
             auto add_block_unlocked = [&](const Pos<uint8>& pos, uint32 block_id) {
                 if (new_block_ids.size() >= 256) {

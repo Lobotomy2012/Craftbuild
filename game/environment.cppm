@@ -12,7 +12,7 @@ module;
 
 export module game.environment;
 
-import misc.types;
+import misc.interger;
 
 using namespace godot;
 

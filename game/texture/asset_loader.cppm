@@ -10,7 +10,8 @@ module;
 export module game.texture.asset_loader;
 
 import misc.ptr;
-import misc.types;
+import misc.str;
+import misc.interger;
 import misc.format;
 import game.logger;
 
@@ -24,14 +25,14 @@ export namespace craftbuild {
     };
 
     struct AssetLoader {
-        inline static std::string base_path = "res://assets/textures/block/";
+        inline static Str base_path = "res://assets/textures/block/";
 
         static ref<Texture2D> load_block_texture(size id, const char* path_suffix, const FaceCount face_count) {
-            if (path_suffix == nullptr or std::string(path_suffix).empty()) {
+            if (path_suffix == nullptr or not Str(path_suffix)) {
                 return ref<Texture2D>();
             }
 
-            String full_path = base_path.c_str();
+            String full_path = base_path.std_str().c_str();
 
             if (face_count == FaceCount::ONE)        full_path += "1 face/";
             else if (face_count == FaceCount::THREE) full_path += "3 faces/";

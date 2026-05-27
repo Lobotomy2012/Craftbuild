@@ -20,9 +20,11 @@ module;
 
 export module game.main;
 
-import misc.types;
-import misc.format;
 import misc.ptr;
+import misc.str;
+import misc.dict;
+import misc.interger;
+import misc.format;
 import game.pos;
 import game.core;
 import game.block;
@@ -41,13 +43,13 @@ export namespace craftbuild {
         GDCLASS(Main, Node3D)
 
     private:
-        std::unordered_map<Pos<int>, ptr<Chunk>, PosHash<int>> chunks;
+        Dict<Pos<int32>, ptr<Chunk>> chunks;
         mutable std::shared_mutex chunks_mutex;
 
         ref<FastNoiseLite> noise;
         ref<ShaderMaterial> world_material;
         std::atomic<int32> world_seed = 0;
-        std::string world_name = "My World";
+        Str world_name = "My World";
 
         none* player_ptr = nullptr;
 
@@ -61,8 +63,8 @@ export namespace craftbuild {
         std::thread scheduler_thread;
         ThreadPool terrain_pool{ 4 };
         ThreadPool mesh_pool{ 4 };
-        std::unordered_set<Pos<int>, PosHash<int>> pending_terrain_jobs;
-        std::unordered_set<Pos<int>, PosHash<int>> pending_mesh_jobs;
+        std::unordered_set<Pos<int>, Hasher<Pos<int>>> pending_terrain_jobs;
+        std::unordered_set<Pos<int>, Hasher<Pos<int>>> pending_mesh_jobs;
         std::mutex pending_jobs_mutex;
 
 		std::vector<Pos<int>> chunks_to_remove;
@@ -100,8 +102,8 @@ export namespace craftbuild {
         uint32 get_global_block_id(int wx, int wy, int wz);
         none set_global_block_id(uint32 block_id, int wx, int wy, int wz);
 
-        none save_world(const std::string& path);
-        bool load_world(const std::string& path);
+        none save_world(const Str& path);
+        bool load_world(const Str& path);
 
         none save_userdata(const char* path = "user://game/userdata.cbdata");
         bool load_userdata(const char* path = "user://game/userdata.cbdata");

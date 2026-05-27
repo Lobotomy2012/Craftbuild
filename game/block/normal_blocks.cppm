@@ -4,13 +4,14 @@ module;
 
 export module game.block.normal_blocks;
 
-import misc.types;
+import misc.str;
+import misc.interger;
 import game.block;
 
 export namespace craftbuild {
 	class AirBlock : public Block1F {
 	public:
-		std::vector<std::pair<std::string, uint64>> init_tags() override {
+		std::vector<std::pair<Str, uint64>> init_tags() override {
 			return { { "transparent", true } };
 		}
 	};

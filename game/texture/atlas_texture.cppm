@@ -5,7 +5,7 @@ module;
 
 export module game.texture.atlas_texture;
 
-import misc.types;
+import misc.interger;
 import misc.format;
 import misc.ptr;
 import game.block;
@@ -30,7 +30,7 @@ export namespace craftbuild {
                 if (original_img.is_null()) continue;
 
                 block.block.value().base_texture_layer = current_layer;
-                log<LogType::VERBOSE>(format{} << "Block: " << block.name.c_str() << " assigned layer: " << current_layer);
+                log<LogType::VERBOSE>(format{} << "Block: " << block.name.std_str().c_str() << " assigned layer: " << current_layer);
 
                 int width = original_img->get_width();
                 int face_count = width / IMAGE_SIZE;

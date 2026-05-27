@@ -4,10 +4,12 @@ module;
 #include <godot_cpp/variant/vector3i.hpp>
 
 #include <includes.hpp>
+#include <xhash>
 
 export module game.pos;
 
-import misc.types;
+import misc.interger;
+import misc.hasher;
 
 using namespace godot;
 
@@ -69,9 +71,9 @@ export namespace craftbuild {
 
     template <typename T>
     requires std::is_arithmetic_v<T>
-    struct PosHash {
+    struct Hasher<Pos<T>> {
         size operator()(const Pos<T>& pos) const {
-            return std::hash<T>()(pos.x) ^ (std::hash<T>()(pos.y) << 16) ^ (std::   hash<T>()(pos.z) << 8);
+            return std::hash<T>{}(pos.x) ^ (std::hash<T>{}(pos.y) << 16) ^ (std::hash<T>{}(pos.z) << 8);
         }
     };
 }

@@ -187,20 +187,23 @@
     <ClCompile Include="game\world\biome.cppm" />
     <ClCompile Include="game\world\chunk.cppm" />
     <ClCompile Include="game\world\terrain.cppm" />
+    <ClCompile Include="misc\dict.cppm" />
     <ClCompile Include="misc\format.cppm">
       <FileType>Document</FileType>
     </ClCompile>
+    <ClCompile Include="misc\hasher.cppm" />
     <ClCompile Include="misc\ptr.cppm">
       <FileType>Document</FileType>
     </ClCompile>
-    <ClCompile Include="misc\types.cppm" />
+    <ClCompile Include="misc\str.cppm" />
+    <ClCompile Include="misc\interger.cppm" />
     <ClInclude Include="includes.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="game\player\player.cpp" />
     <ClCompile Include="game\main\main.cpp" />
-    <ClCompile Include="misc\types.cpp" />
+    <ClCompile Include="misc\interger.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

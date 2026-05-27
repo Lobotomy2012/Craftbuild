@@ -10,7 +10,7 @@ module;
 export module game.player;
 
 import misc.ptr;
-import misc.types;
+import misc.interger;
 import misc.format;
 import game.core;
 import game.block;

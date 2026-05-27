@@ -6,7 +6,7 @@ module;
 #include <vector>
 #include <compare>
 
-module misc.types;
+module misc.interger;
 
 // uint128
 uint128::uint128() : __value__(0), __over__(0) {}

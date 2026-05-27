@@ -29,7 +29,7 @@
     <ClCompile Include="game\player\player.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="misc\types.cpp">
+    <ClCompile Include="misc\interger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="game\block\block.cppm">
@@ -68,7 +68,7 @@
     <ClCompile Include="game\player\skin_manager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="misc\types.cppm">
+    <ClCompile Include="misc\interger.cppm">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="game\thread.cppm">
@@ -87,6 +87,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="game\environment.cppm">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="misc\str.cppm">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="misc\hasher.cppm">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="misc\dict.cppm">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

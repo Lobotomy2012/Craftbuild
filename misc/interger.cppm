@@ -4,7 +4,7 @@ module;
 #include <includes.hpp>
 #include <cstdint>
 
-export module misc.types;
+export module misc.interger;
 
 export using int8 = int8_t;
 export using int16 = int16_t;

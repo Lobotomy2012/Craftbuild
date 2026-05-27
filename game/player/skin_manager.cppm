@@ -9,7 +9,7 @@ module;
 export module game.player.skin_manager;
 
 import misc.ptr;
-import misc.types;
+import misc.interger;
 import misc.format;
 import game.logger;
 

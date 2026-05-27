@@ -10,7 +10,9 @@ module;
 export module game.block;
 
 import misc.ptr;
-import misc.types;
+import misc.str;
+import misc.dict;
+import misc.interger;
 import game.pos;
 import game.core;
 import game.texture.asset_loader;
@@ -30,18 +32,18 @@ export namespace craftbuild {
     };
 
     struct TagEntry {
-        std::string name;
+        Str name;
         std::vector<uint64> value;
 
         TagEntry() = default;
-        TagEntry(const std::string& n) : name(n) {}
+        TagEntry(const Str& n) : name(n) {}
     };
 
     struct TagRegistry {
         inline static std::vector<TagEntry> tag;
-        inline static std::unordered_map<std::string, uint32> tag2id;
+        inline static Dict<Str, uint32> tag2id;
 
-        static none register_tag(const std::string& name) {
+        static none register_tag(const Str& name) {
             tag.push_back(name);
             tag2id[name] = tag.size() - 1;
         }
@@ -55,11 +57,11 @@ export namespace craftbuild {
             return tag[tag_id].value;
         }
 
-        static std::string get_name(uint32 tag_id) {
+        static Str get_name(uint32 tag_id) {
             return tag[tag_id].name;
         }
 
-        static uint32 get_id(const std::string& tag_name) {
+        static uint32 get_id(const Str& tag_name) {
             if (tag2id.find(tag_name) == tag2id.end()) return 0;
             return tag2id[tag_name];
         }
@@ -73,7 +75,7 @@ export namespace craftbuild {
         virtual ~Block() = default;
         virtual int get_texture_layer(Face face) const = 0;
 
-		virtual std::vector<std::pair<std::string, uint64>> init_tags() { return {}; }
+		virtual std::vector<std::pair<Str, uint64>> init_tags() { return {}; }
 
         static none create_face(Face face, const Vector3& pos, std::vector<Pos<real>>& vertices) {
             switch (face) {
@@ -150,19 +152,19 @@ export namespace craftbuild {
 
     struct BlockEntry {
         ptr<Block> block;
-        std::string name;
+        Str name;
         ref<Texture2D> texture;
 
-        BlockEntry(ptr<Block> b, const std::string& n, ref<Texture2D> t) : block(b), name(n), texture(t) {}
+        BlockEntry(ptr<Block> b, const Str& n, ref<Texture2D> t) : block(b), name(n), texture(t) {}
     };
 
     struct BlockRegistry {
         inline static std::vector<BlockEntry> registry;
-        inline static std::unordered_map<std::string, uint32> name2id;
+        inline static Dict<Str, uint32> name2id;
 
         template <typename T>
         requires std::derived_from<T, Block>
-        static none register_block(const std::string& name, const char* path) {
+        static none register_block(const Str& name, const char* path) {
             ptr<Block> block = new T();
             ref<Texture2D> texture;
             if (dynamic_cast<Block1F*>(block.c_ptr())) {
@@ -186,12 +188,12 @@ export namespace craftbuild {
             return registry[block_id].block;
         }
 
-        static std::string get_name(uint32 block_id) {
+        static Str get_name(uint32 block_id) {
             if (registry.size() <= block_id) return "Air";
             return registry[block_id].name;
         }
 
-        static uint32 get_id(const std::string& block_name) {
+        static uint32 get_id(const Str& block_name) {
             if (name2id.find(block_name) == name2id.end()) return 0;
             return name2id[block_name];
         }

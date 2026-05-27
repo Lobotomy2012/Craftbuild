@@ -9,7 +9,7 @@ module;
 export module game.world.terrain;
 
 import misc.ptr;
-import misc.types;
+import misc.interger;
 
 export namespace craftbuild {
     struct WorldGenerationContext {

@@ -6,7 +6,7 @@ module;
 
 export module misc.ptr;
 
-import misc.types;
+import misc.interger;
 import misc.format;
 
 using namespace godot;

@@ -16,13 +16,14 @@ module;
 
 #include <includes.hpp>
 #include <cmath>
+#include <thread>
+#include <chrono>
+#include <random>
+#include <string>
+#include <cstring>
 #include <fstream>
 #include <filesystem>
-#include <thread>
 #include <shared_mutex>
-#include <chrono>
-#include <cstring>
-#include <random>
 
 module game.main;
 
@@ -207,7 +208,7 @@ namespace craftbuild {
     }
 
     none Main::_notification(int p_what) {
-        std::string file_name = format{} << "user://game/saves/" << world_name << "/overworld.cbsave";
+        Str file_name = format{} << "user://game/saves/" << world_name << "/overworld.cbsave";
         if (p_what == NOTIFICATION_WM_CLOSE_REQUEST) save_world(file_name); // Auto save
         else if (p_what == NOTIFICATION_APPLICATION_FOCUS_OUT) emit_signal("pause");
         else if (p_what == NOTIFICATION_EXIT_TREE) {
@@ -527,8 +528,8 @@ namespace craftbuild {
         chunk.value().set_block({ (uint8)lx, (uint8)wy, (uint8)lz }, block_id);
     }
 
-    none Main::save_world(const std::string& path) {
-        String real_path = ProjectSettings::get_singleton()->globalize_path(path.c_str());
+    none Main::save_world(const Str& path) {
+        String real_path = ProjectSettings::get_singleton()->globalize_path(path.std_str().c_str());
         std::string std_path = real_path.utf8().get_data();
 
         // Tạo thư mục
@@ -614,8 +615,8 @@ namespace craftbuild {
         log<LogType::VERBOSE>(format{} << chunk_count << " chunks");
     }
 
-    bool Main::load_world(const std::string& path) {
-        String real_path = ProjectSettings::get_singleton()->globalize_path(path.c_str());
+    bool Main::load_world(const Str& path) {
+        String real_path = ProjectSettings::get_singleton()->globalize_path(path.std_str().c_str());
         std::string std_path = real_path.utf8().get_data();
 
         std::ifstream ifs(std_path, std::ios::binary);
