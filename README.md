@@ -4,13 +4,13 @@ Created by nam-ann using C++23 and Godot 4.1 :game_die:
 </p>
 
 # Craftbuild
-A Minecraft likes Voxel game made with C++23 and Godot.
+A Minecraft-like Voxel game made with C++23 and Godot.
 
 # Status
 Indev
 
 # Features
-- Enviroment
+- Environment
 - Generate terrain
 - Save/Load world
 - Collision, Camera, Skin
@@ -20,7 +20,7 @@ Indev
 - Multi-threading
 - Greedy meshing, texture LOD
 
-# Comming soon
+# Coming soon
 - Hotbar
 - Place block
 - Lighting system
@@ -34,6 +34,6 @@ Minecraft © Mojang Studios. All rights reserved.
 Minecraft is a trademark of Mojang Studios. This project is not affiliated with, endorsed by, or sponsored by Mojang Studios or Microsoft.
 
 # Support
-If you find this project useful, please consider giving it a star on GitHub. Thanks you! :)
+If you find this project useful, please consider giving it a star on GitHub. Thank you! :)
 
 <img width="1908" height="783" alt="image" src="https://github.com/user-attachments/assets/8922eb81-91cd-4b7e-8c94-ed2f618442f3" />
