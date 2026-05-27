@@ -12,8 +12,8 @@ module game.player.skin_manager;
 import game.player;
 
 namespace craftbuild {
-    ref<StandardMaterial3D> SkinManager::create_skin_material(ref<Texture2D> texture) {
-        ref<StandardMaterial3D> mat;
+    Ref<StandardMaterial3D> SkinManager::create_skin_material(Ref<Texture2D> texture) {
+        Ref<StandardMaterial3D> mat;
         mat.instantiate();
         mat->set_texture(StandardMaterial3D::TEXTURE_ALBEDO, texture);
         mat->set_flag(StandardMaterial3D::FLAG_ALBEDO_TEXTURE_FORCE_SRGB, true);
@@ -21,10 +21,10 @@ namespace craftbuild {
         return mat;
     }
 
-    none SkinManager::apply_skin_to_model(MeshInstance3D* model, ref<Texture2D> texture) {
+    none SkinManager::apply_skin_to_model(MeshInstance3D* model, Ref<Texture2D> texture) {
         if (not model) return;
 
-        ref<StandardMaterial3D> mat = create_skin_material(texture);
+        Ref<StandardMaterial3D> mat = create_skin_material(texture);
         model->set_material_override(mat);
         log<LogType::VERBOSE>("Skin applied to model");
     }

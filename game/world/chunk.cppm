@@ -17,7 +17,8 @@ export module game.world.chunk;
 import misc.ptr;
 import misc.str;
 import misc.dict;
-import misc.interger;
+import misc.range;
+import misc.number;
 import game.pos;
 import game.block;
 import game.logger;
@@ -65,7 +66,7 @@ export namespace craftbuild {
         std::atomic<bool> collision_built = false;
 
         std::atomic<bool> mesh_ready{ false };
-        ptr<MeshData> pending_mesh_data = nullptr;
+        Ptr<MeshData> pending_mesh_data = nullptr;
         mutable std::mutex mesh_mutex;
         mutable std::shared_mutex data_mutex;
 
@@ -104,7 +105,7 @@ export namespace craftbuild {
             };
         }
 
-        static Biome select_biome_at(int32 wx, int32 wz, ref<FastNoiseLite> noise, size biome_count) {
+        static Biome select_biome_at(int32 wx, int32 wz, Ref<FastNoiseLite> noise, size biome_count) {
             if (biome_count == 0) return { 0.01f, 40.0f, 0.4f, 4.0f, 60.0f, 0 };
 
             const float32 biome_noise_val = noise->get_noise_2d(
@@ -116,7 +117,7 @@ export namespace craftbuild {
             return BiomeRegistry::get_biome(biome_idx);
         }
 
-        static Biome get_blended_biome(int32 wx, int32 wz, ref<FastNoiseLite> noise, size biome_count) {
+        static Biome get_blended_biome(int32 wx, int32 wz, Ref<FastNoiseLite> noise, size biome_count) {
             if (biome_count <= 1) return select_biome_at(wx, wz, noise, biome_count);
 
             static constexpr int32 BLEND_CELL_SIZE = 96;
@@ -246,7 +247,7 @@ export namespace craftbuild {
             return tag_ids.find(blocks[pos.x][pos.y][pos.z].tag) != tag_ids.end() ? tag_ids.at(blocks[pos.x][pos.y][pos.z].tag) : std::make_pair(0U, (uint16)0);
         }
 
-        none generate_terrain(int32 seed, ref<FastNoiseLite> noise) {
+        none generate_terrain(int32 seed, Ref<FastNoiseLite> noise) {
             const uint32 AIR   = BlockRegistry::get_id("Air");
             const uint32 GRASS = BlockRegistry::get_id("Grass Block");
             const uint32 DIRT  = BlockRegistry::get_id("Dirt");
@@ -278,8 +279,8 @@ export namespace craftbuild {
             };
 
             const size biome_count = BiomeRegistry::registry.size();
-            for (uint8 x = 0; x < SIZE_X; ++x) {
-                for (uint8 z = 0; z < SIZE_Z; ++z) {
+            for (auto x : range<uint8>(SIZE_X)) {
+                for (auto z : range<uint8>(SIZE_Z)) {
                     int32 global_x = chunk_pos.x * SIZE_X + x;
                     int32 global_z = chunk_pos.z * SIZE_Z + z;
 
@@ -296,7 +297,7 @@ export namespace craftbuild {
 
                     int solid_depth = -1;
 
-                    for (int y = SIZE_Y - 1; y >= 0; --y) {
+                    for (auto y : range<int16>(SIZE_Y - 1, -1)) {
                         if (y == 0) {
                             add_block_unlocked({ x, (uint8)y, z }, BEDROCK);
                             continue;
@@ -341,8 +342,8 @@ export namespace craftbuild {
             dirty.store(true, std::memory_order_release);
         }
 
-        none generate_mesh(ptr<Chunk> neighbors[4]) {
-            ptr<MeshData> data = new MeshData();
+        none generate_mesh(Ptr<Chunk> neighbors[4]) {
+            Ptr<MeshData> data = new MeshData();
             auto& vertices = data.value().vertices;
             auto& normals = data.value().normals;
             auto& indices = data.value().indices;
@@ -362,7 +363,7 @@ export namespace craftbuild {
 
             std::vector<std::shared_mutex*> mutexes_to_lock;
             mutexes_to_lock.push_back(&data_mutex);
-            for (int i = 0; i < 4; ++i) if (neighbors[i]) mutexes_to_lock.push_back(&neighbors[i].value().data_mutex);
+            for (auto i : range<int>(4)) if (neighbors[i]) mutexes_to_lock.push_back(&neighbors[i].value().data_mutex);
 
             std::sort(mutexes_to_lock.begin(), mutexes_to_lock.end());
             mutexes_to_lock.erase(std::unique(mutexes_to_lock.begin(), mutexes_to_lock.end()), mutexes_to_lock.end());
@@ -385,7 +386,7 @@ export namespace craftbuild {
                     else if (bz >= Chunk::SIZE_Z) nid = 2;
                     else if (bz < 0)              nid = 3;
 
-                    ptr<Chunk> neighbor = neighbors[nid];
+                    Ptr<Chunk> neighbor = neighbors[nid];
                     if (not neighbor or not neighbor.value().generated.load(std::memory_order_acquire)) return true;
 
                     uint8 lx = (uint8)((bx % Chunk::SIZE_X + Chunk::SIZE_X) % Chunk::SIZE_X);
@@ -410,7 +411,7 @@ export namespace craftbuild {
             auto get_block_layer = [&](int bx, int by, int bz, Face face) -> int {
                 uint32 id = get_block<false>({ (uint8)bx, (uint8)by, (uint8)bz });
                 if (id == AIR) return -1;
-                ptr<Block> block = BlockRegistry::get_block(id);
+                Ptr<Block> block = BlockRegistry::get_block(id);
                 if (not block) return -1;
                 return block.value().get_texture_layer(face);
             };
@@ -420,7 +421,7 @@ export namespace craftbuild {
             const Face back_faces[3] =  { Face::LEFT,  Face::BOTTOM, Face::BACK  };
 
             uint64 vertex_offset = 0;
-            for (int d = 0; d < 3; ++d) {
+            for (auto d : range<int>(3)) {
                 const int u = (d + 1) % 3;
                 const int v = (d + 2) % 3;
 
@@ -450,8 +451,9 @@ export namespace craftbuild {
                         }
                     }
 
-                    for (int64 j = 0; j < dims[v]; ++j) {
-                        for (int64 i = 0; i < dims[u]; ) {
+                    for (auto j : range<int64>(dims[v])) {
+                        int64 i = 0;
+                        while (i < dims[u]) {
                             FaceMask current_face = mask[i + j * dims[u]];
                             if (current_face.layer < 0) {
                                 ++i;
@@ -521,10 +523,10 @@ export namespace craftbuild {
                             else if (d == 1) normal.y = current_face.back_face ? -1.0f : 1.0f;
                             else if (d == 2) normal.z = current_face.back_face ? -1.0f : 1.0f;
 
-                            for (int n = 0; n < 4; ++n) normals.push_back(normal);
+                            for (auto n : range<int>(4)) normals.push_back(normal);
 
                             Vector2 layer_uv(static_cast<float>(current_face.layer), 0.0f);
-                            for (int n = 0; n < 4; ++n) uvs_layer.push_back(layer_uv);
+                            for (auto n : range<int>(4)) uvs_layer.push_back(layer_uv);
 
                             indices.push_back(vertex_offset + 0); indices.push_back(vertex_offset + 2); indices.push_back(vertex_offset + 1);
                             indices.push_back(vertex_offset + 0); indices.push_back(vertex_offset + 3); indices.push_back(vertex_offset + 2);
@@ -538,8 +540,8 @@ export namespace craftbuild {
 
                             vertex_offset += 4;
 
-                            for (int v_idx = 0; v_idx < height; ++v_idx)
-                                for (int u_idx = 0; u_idx < width; ++u_idx)
+                            for (auto v_idx : range<int>(height))
+                                for (auto u_idx : range<int>(width))
                                     mask[(i + u_idx) + (j + v_idx) * dims[u]] = { -1, false };
 
                             i += width;

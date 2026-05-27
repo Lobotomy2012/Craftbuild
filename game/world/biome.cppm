@@ -6,7 +6,7 @@ export module game.world.biome;
 
 import misc.str;
 import misc.dict;
-import misc.interger;
+import misc.number;
 
 export namespace craftbuild {
 	struct Biome {

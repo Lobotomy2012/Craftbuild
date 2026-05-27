@@ -9,7 +9,7 @@ module;
 export module game.player.skin_manager;
 
 import misc.ptr;
-import misc.interger;
+import misc.number;
 import misc.format;
 import game.logger;
 
@@ -20,7 +20,7 @@ export namespace craftbuild {
     class SkinManager {
     public:
         static bool load_skin(Player& player, const char* path);
-        static ref<StandardMaterial3D> create_skin_material(ref<Texture2D> texture);
-        static none apply_skin_to_model(MeshInstance3D* model, ref<Texture2D> texture);
+        static Ref<StandardMaterial3D> create_skin_material(Ref<Texture2D> texture);
+        static none apply_skin_to_model(MeshInstance3D* model, Ref<Texture2D> texture);
     };
 }

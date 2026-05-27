@@ -13,7 +13,7 @@ module;
 export module game.logger;
 
 import misc.str;
-import misc.interger;
+import misc.number;
 import misc.format;
 import game.core;
 import game.thread;

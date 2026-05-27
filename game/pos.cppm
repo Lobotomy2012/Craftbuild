@@ -8,7 +8,7 @@ module;
 
 export module game.pos;
 
-import misc.interger;
+import misc.number;
 import misc.hasher;
 
 using namespace godot;

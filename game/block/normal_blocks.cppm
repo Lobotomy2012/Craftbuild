@@ -5,7 +5,7 @@ module;
 export module game.block.normal_blocks;
 
 import misc.str;
-import misc.interger;
+import misc.number;
 import game.block;
 
 export namespace craftbuild {

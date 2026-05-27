@@ -5,7 +5,8 @@ module;
 
 export module game.texture.atlas_texture;
 
-import misc.interger;
+import misc.range;
+import misc.number;
 import misc.format;
 import misc.ptr;
 import game.block;
@@ -17,7 +18,7 @@ export namespace craftbuild {
     inline uint8 IMAGE_SIZE = 128;
 
 	struct AtlasTexture {
-		inline static ref<Texture2DArray> atlas_texture;
+		inline static Ref<Texture2DArray> atlas_texture;
 
         static none build_texture_array() {
             Array images;
@@ -26,7 +27,7 @@ export namespace craftbuild {
             for (const auto& block : BlockRegistry::registry) {
                 if (block.texture.is_null()) continue;
 
-                ref<Image> original_img = block.texture->get_image();
+                Ref<Image> original_img = block.texture->get_image();
                 if (original_img.is_null()) continue;
 
                 block.block.value().base_texture_layer = current_layer;
@@ -35,8 +36,8 @@ export namespace craftbuild {
                 int width = original_img->get_width();
                 int face_count = width / IMAGE_SIZE;
 
-                for (int i = 0; i < face_count; ++i) {
-                    ref<Image> tile = original_img->get_region(Rect2i(i * IMAGE_SIZE, 0, IMAGE_SIZE, IMAGE_SIZE));
+                for (auto i : range<int>(face_count)) {
+                    Ref<Image> tile = original_img->get_region(Rect2i(i * IMAGE_SIZE, 0, IMAGE_SIZE, IMAGE_SIZE));
 
                     tile->convert(Image::FORMAT_RGBA8);
                     images.push_back(tile);

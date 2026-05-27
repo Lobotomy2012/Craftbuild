@@ -3,7 +3,7 @@
 #include <includes.hpp>
 #include <windows.h>
 
-import misc.interger;
+import misc.number;
 import misc.format;
 import game.core;
 import game.environment;

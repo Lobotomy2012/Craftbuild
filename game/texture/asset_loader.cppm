@@ -11,7 +11,7 @@ export module game.texture.asset_loader;
 
 import misc.ptr;
 import misc.str;
-import misc.interger;
+import misc.number;
 import misc.format;
 import game.logger;
 
@@ -27,9 +27,9 @@ export namespace craftbuild {
     struct AssetLoader {
         inline static Str base_path = "res://assets/textures/block/";
 
-        static ref<Texture2D> load_block_texture(size id, const char* path_suffix, const FaceCount face_count) {
+        static Ref<Texture2D> load_block_texture(size id, const char* path_suffix, const FaceCount face_count) {
             if (path_suffix == nullptr or not Str(path_suffix)) {
-                return ref<Texture2D>();
+                return Ref<Texture2D>();
             }
 
             String full_path = base_path.std_str().c_str();
@@ -40,7 +40,7 @@ export namespace craftbuild {
 
             full_path += path_suffix;
 
-            ref<Texture2D> tex = ResourceLoader::get_singleton()->load(full_path);
+            Ref<Texture2D> tex = ResourceLoader::get_singleton()->load(full_path);
             if (tex.is_valid()) {
                 log<LogType::VERBOSE>(format{} << "Loaded texture: " << full_path.ascii());
                 return tex;
@@ -48,7 +48,7 @@ export namespace craftbuild {
             else {
                 log<LogType::ERROR>(format{} << "Failed to load texture: " << full_path.ascii());
             }
-            return ref<Texture2D>();
+            return Ref<Texture2D>();
         }
     };
 }

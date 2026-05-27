@@ -29,7 +29,7 @@ import game.main;
 
 namespace craftbuild {
     bool SkinManager::load_skin(Player& player, const char* path) {
-        ref<Texture2D> skin_tex = ResourceLoader::get_singleton()->load(path);
+        Ref<Texture2D> skin_tex = ResourceLoader::get_singleton()->load(path);
         if (skin_tex.is_null()) {
             log<LogType::ERROR>(format{} << "Failed to load skin: " << path);
             return false;
@@ -52,7 +52,7 @@ namespace craftbuild {
         // Model
         auto* model = get_node<MeshInstance3D>("Mesh");
 
-        ref<BoxMesh> box = memnew(BoxMesh);
+        Ref<BoxMesh> box = memnew(BoxMesh);
         box->set_size(Vector3(0.6f, 2.0f, 0.3f));
 
         model->set_mesh(box);
@@ -61,7 +61,7 @@ namespace craftbuild {
         // Collision
         auto* collision = get_node<CollisionShape3D>("Shape");
 
-        ref<CapsuleShape3D> capsule = memnew(CapsuleShape3D);
+        Ref<CapsuleShape3D> capsule = memnew(CapsuleShape3D);
         capsule->set_radius(0.3f);
         capsule->set_height(1.8f);
 
@@ -162,7 +162,7 @@ namespace craftbuild {
         move_and_slide();
     }
 
-    none Player::_input(const ref<InputEvent>& event) {
+    none Player::_input(const Ref<InputEvent>& event) {
         if (not camera or not world_ptr) return;
         Main* world = static_cast<Main*>(world_ptr);
         if (world->pausing.load(std::memory_order_relaxed)) return;
@@ -227,7 +227,7 @@ namespace craftbuild {
             }
         }
 
-        for (int i = 0; i < 9; ++i) {
+        for (auto i : range<int>(9)) {
             Key key = (Key)(KEY_1 + i);
             if (Input::get_singleton()->is_key_pressed(key)) {
                 if (event->is_pressed() and not event->is_echo()) {

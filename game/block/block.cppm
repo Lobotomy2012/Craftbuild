@@ -12,7 +12,7 @@ export module game.block;
 import misc.ptr;
 import misc.str;
 import misc.dict;
-import misc.interger;
+import misc.number;
 import game.pos;
 import game.core;
 import game.texture.asset_loader;
@@ -151,11 +151,11 @@ export namespace craftbuild {
     };
 
     struct BlockEntry {
-        ptr<Block> block;
+        Ptr<Block> block;
         Str name;
-        ref<Texture2D> texture;
+        Ref<Texture2D> texture;
 
-        BlockEntry(ptr<Block> b, const Str& n, ref<Texture2D> t) : block(b), name(n), texture(t) {}
+        BlockEntry(Ptr<Block> b, const Str& n, Ref<Texture2D> t) : block(b), name(n), texture(t) {}
     };
 
     struct BlockRegistry {
@@ -165,8 +165,8 @@ export namespace craftbuild {
         template <typename T>
         requires std::derived_from<T, Block>
         static none register_block(const Str& name, const char* path) {
-            ptr<Block> block = new T();
-            ref<Texture2D> texture;
+            Ptr<Block> block = new T();
+            Ref<Texture2D> texture;
             if (dynamic_cast<Block1F*>(block.c_ptr())) {
                 texture = AssetLoader::load_block_texture(registry.size(), path, FaceCount::ONE);
             }
@@ -183,7 +183,7 @@ export namespace craftbuild {
             name2id[name] = registry.size() - 1;
         }
 
-        static ptr<Block> get_block(uint32 block_id) {
+        static Ptr<Block> get_block(uint32 block_id) {
             if (registry.size() <= block_id) return registry[get_id("Air")].block;
             return registry[block_id].block;
         }

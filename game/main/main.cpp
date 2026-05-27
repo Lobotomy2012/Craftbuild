@@ -109,7 +109,7 @@ namespace craftbuild {
 
         if (not world_ready.load(std::memory_order_acquire)) return;
 
-        std::vector<ptr<Chunk>> chunks_to_upload;
+        std::vector<Ptr<Chunk>> chunks_to_upload;
         {
             std::shared_lock lock(chunks_mutex);
             for (const auto& E : chunks) {
@@ -125,7 +125,7 @@ namespace craftbuild {
         for (auto& chunk_ptr : chunks_to_upload) {
             if (updates_this_frame >= max_updates) break;
 
-            ptr<MeshData> data = nullptr;
+            Ptr<MeshData> data = nullptr;
             {
                 std::lock_guard lock(chunk_ptr.value().mesh_mutex);
                 if (chunk_ptr.value().pending_mesh_data) {
@@ -137,7 +137,7 @@ namespace craftbuild {
 
             if (not data) continue;
 
-            ref<ArrayMesh> mesh;
+            Ref<ArrayMesh> mesh;
             mesh.instantiate();
 
             if (data.value().vertices.size() != 0) {
@@ -224,7 +224,7 @@ namespace craftbuild {
         }
     }
 
-    none Main::_input(const ref<InputEvent>& event) {
+    none Main::_input(const Ref<InputEvent>& event) {
         // ESC: Lock/Unlock mouse
         if (event->is_action_pressed("ui_cancel")) {
             if (not pausing.load(std::memory_order_relaxed)) emit_signal("pause");
@@ -233,10 +233,10 @@ namespace craftbuild {
     }
 
     none Main::setup_voxel_material() {
-        ref<ShaderMaterial> mat;
+        Ref<ShaderMaterial> mat;
         mat.instantiate();
 
-        ref<Shader> shader;
+        Ref<Shader> shader;
         shader.instantiate();
         shader->set_code(R"(
             shader_type spatial;
@@ -306,7 +306,7 @@ namespace craftbuild {
             ThreadRegistry::register_thread("Scheduler Thread");
 
             auto last_unload_time = std::chrono::high_resolution_clock::now();
-            while (running.load()) {
+            while (running.load(std::memory_order_relaxed)) {
                 submit_jobs();
 
                 auto now = std::chrono::high_resolution_clock::now();
@@ -316,7 +316,7 @@ namespace craftbuild {
                 }
 
                 std::unique_lock<std::mutex> lock(loop_mutex);
-                loop_cv.wait_for(lock, std::chrono::milliseconds(100));
+                loop_cv.wait_for(lock, std::chrono::milliseconds(250));
             }
         });
     }
@@ -327,9 +327,9 @@ namespace craftbuild {
         static constexpr int max_jobs_per_tick = 32;
         int submitted = 0;
 
-        for (int r = 0; r <= render_distance; ++r) {
-            for (int x = -r; x <= r; ++x) {
-                for (int z = -r; z <= r; ++z) {
+        for (auto r : range<int>(render_distance + 1)) {
+            for (auto x : range<int>(-r, r + 1)) {
+                for (auto z : range<int>(-r, r + 1)) {
                     if (std::abs(x) != r and std::abs(z) != r) continue;
 
                     Pos<int> chunk_pos{ px + x, 0, pz + z };
@@ -345,13 +345,14 @@ namespace craftbuild {
 
                         terrain_pool.enqueue([this, chunk, chunk_pos]() {
                             if (running.load()) {
-                                if (not chunk.value().generated.load(std::memory_order_acquire)) {
-                                    chunk.value().generate_terrain(world_seed.load(), noise);
-                                    chunk.value().dirty.store(true, std::memory_order_release);
+                                auto& _chunk = chunk.value();
+                                if (not _chunk.generated.load(std::memory_order_acquire)) {
+                                    _chunk.generate_terrain(world_seed.load(), noise);
+                                    _chunk.dirty.store(true, std::memory_order_release);
 
                                     Pos<int> offsets[4] = { {1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1} };
                                     for (auto& o : offsets) {
-                                        auto n = get_chunk(chunk.value().chunk_pos.x + o.x, chunk.value().chunk_pos.z + o.z);
+                                        auto n = get_chunk(_chunk.chunk_pos.x + o.x, _chunk.chunk_pos.z + o.z);
                                         if (n and n.value().generated.load(std::memory_order_acquire)) n.value().dirty.store(true);
                                     }
                                 }
@@ -375,7 +376,7 @@ namespace craftbuild {
                         if (running.load(std::memory_order_relaxed)) {
                             auto& _chunk = chunk.value();
                             if (_chunk.dirty.load() or _chunk.mesh_ready.load()) {
-                                ptr<Chunk> neighbors[4] = {
+                                Ptr<Chunk> neighbors[4] = {
                                     get_chunk(_chunk.chunk_pos.x + 1, _chunk.chunk_pos.z),
                                     get_chunk(_chunk.chunk_pos.x - 1, _chunk.chunk_pos.z),
                                     get_chunk(_chunk.chunk_pos.x, _chunk.chunk_pos.z + 1),
@@ -398,7 +399,7 @@ namespace craftbuild {
         }
     }
 
-    ptr<Chunk> Main::get_or_create_chunk(const Pos<int>& chunk_pos) {
+    Ptr<Chunk> Main::get_or_create_chunk(const Pos<int>& chunk_pos) {
         {
             std::shared_lock lock(chunks_mutex);
             auto it = chunks.find(chunk_pos);
@@ -409,18 +410,18 @@ namespace craftbuild {
         auto it = chunks.find(chunk_pos);
         if (it != chunks.end()) return it->second;
 
-        ptr<Chunk> chunk(new Chunk());
+        Ptr<Chunk> chunk(new Chunk());
         chunk.value().chunk_pos = chunk_pos;
         chunks[chunk_pos] = chunk;
         return chunk;
     }
 
-    none Main::create_chunk_collision(ptr<Chunk> chunk, const PackedVector3Array& collision_faces) {
+    none Main::create_chunk_collision(Ptr<Chunk> chunk, const PackedVector3Array& collision_faces) {
 		std::shared_lock lock(chunks_mutex);
 
         if (not chunk.value().mesh_instance or chunk.value().collision_built.load(std::memory_order_relaxed)) return;
         
-        for (int i = chunk.value().mesh_instance->get_child_count() - 1; i >= 0; --i) {
+        for (auto i : range<int32>(chunk.value().mesh_instance->get_child_count() - 1, -1)) {
             Node* child = chunk.value().mesh_instance->get_child(i);
             if (Object::cast_to<StaticBody3D>(child)) {
                 chunk.value().mesh_instance->remove_child(child);
@@ -428,7 +429,7 @@ namespace craftbuild {
             }
         }
 
-        ref<ArrayMesh> mesh = chunk.value().mesh_instance->get_mesh();
+        Ref<ArrayMesh> mesh = chunk.value().mesh_instance->get_mesh();
         if (mesh.is_null() or mesh->get_surface_count() == 0) return;
         if (collision_faces.size() == 0) return;
 
@@ -439,7 +440,7 @@ namespace craftbuild {
 
         StaticBody3D* static_body = memnew(StaticBody3D);
         CollisionShape3D* col_shape = memnew(CollisionShape3D);
-        ref<ConcavePolygonShape3D> concave;
+        Ref<ConcavePolygonShape3D> concave;
         concave.instantiate();
 
         concave->set_faces(collision_faces);
@@ -450,7 +451,7 @@ namespace craftbuild {
         chunk.value().collision_built.store(true, std::memory_order_release);
     }
     
-    none Main::update_chunk_mesh(ptr<Chunk> chunk, ref<ArrayMesh> mesh, PackedVector3Array& collision_faces) {
+    none Main::update_chunk_mesh(Ptr<Chunk> chunk, Ref<ArrayMesh> mesh, PackedVector3Array& collision_faces) {
         if (not chunk.value().mesh_instance) {
             MeshInstance3D* mi = memnew(MeshInstance3D);
             mi->set_position(Vector3(chunk.value().chunk_pos.x * Chunk::SIZE_X, 0,chunk.value().chunk_pos.z * Chunk::SIZE_Z));
@@ -487,7 +488,7 @@ namespace craftbuild {
         if (not chunks_to_remove.empty()) log<LogType::VERBOSE>(format{} << "Queued unload for " << chunks_to_remove.size() << " chunks.");
     }
 
-    ptr<Chunk> Main::get_chunk(int cx, int cz) {
+    Ptr<Chunk> Main::get_chunk(int cx, int cz) {
         std::shared_lock lock(chunks_mutex);
         Pos<int> cpos(cx, 0, cz);
 
@@ -503,7 +504,7 @@ namespace craftbuild {
         int cz = static_cast<int>(std::floor((float32)wz / Chunk::SIZE_Z));
         Pos<int> cpos(cx, 0, cz);
 
-        ptr<Chunk> chunk = get_chunk(cx, cz);
+        Ptr<Chunk> chunk = get_chunk(cx, cz);
         if (not chunk) return BlockRegistry::get_id("Air");
 
         int lx = (wx % Chunk::SIZE_X + Chunk::SIZE_X) % Chunk::SIZE_X;
@@ -519,7 +520,7 @@ namespace craftbuild {
         int cz = static_cast<int>(std::floor((float32)wz / Chunk::SIZE_Z));
         Pos<int> cpos(cx, 0, cz);
 
-        ptr<Chunk> chunk = get_chunk(cx, cz);
+        Ptr<Chunk> chunk = get_chunk(cx, cz);
         if (not chunk) return;
 
         int lx = (wx % Chunk::SIZE_X + Chunk::SIZE_X) % Chunk::SIZE_X;
@@ -554,7 +555,7 @@ namespace craftbuild {
 
         ofs.write(version, sizeof(char) * version_len);
 
-        std::vector<std::pair<Pos<int>, ptr<Chunk>>> chunks_to_save;
+        std::vector<std::pair<Pos<int>, Ptr<Chunk>>> chunks_to_save;
         {
             std::shared_lock lock(chunks_mutex);
 
@@ -651,7 +652,7 @@ namespace craftbuild {
             chunks.clear();
         }
 
-        for (uint32 i = 0; i < chunk_count; ++i) {
+        for (auto i : range<uint32>(chunk_count)) {
             Pos<int> pos;
             ifs.read(reinterpret_cast<byte*>(&pos.x), sizeof(int32));
             ifs.read(reinterpret_cast<byte*>(&pos.y), sizeof(int32));
@@ -665,7 +666,7 @@ namespace craftbuild {
 
             uint8 block_ids_size = 0;
             ifs.read(reinterpret_cast<byte*>(&block_ids_size), sizeof(uint8));
-            for (uint8 j = 0; j < block_ids_size; ++j) {
+            for (auto j : range<uint8>(block_ids_size)) {
                 uint8 local_id;
                 uint32 global_id;
                 ifs.read(reinterpret_cast<byte*>(&local_id), sizeof(uint8));
@@ -675,7 +676,7 @@ namespace craftbuild {
 
             uint8 tag_ids_size = 0;
             ifs.read(reinterpret_cast<byte*>(&tag_ids_size), sizeof(uint8));
-            for (uint8 j = 0; j < tag_ids_size; ++j) {
+            for (auto j : range<uint8>(tag_ids_size)) {
                 uint8 local_id;
                 std::pair<uint32, uint16> global_id;
                 ifs.read(reinterpret_cast<byte*>(&local_id), sizeof(uint8));
@@ -688,7 +689,7 @@ namespace craftbuild {
             ifs.read(reinterpret_cast<byte*>(&complex_size), sizeof(uint32));
 
             auto& map = chunk.value().complex_blocks;
-            for (uint32 j = 0; j < complex_size; ++j) {
+            for (auto j : range<uint32>(complex_size)) {
                 uint8 x, y, z;
                 uint32 block_id, tag;
 

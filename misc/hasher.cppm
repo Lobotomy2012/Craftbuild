@@ -5,7 +5,7 @@ module;
 
 export module misc.hasher;
 
-import misc.interger;
+import misc.number;
 
 export namespace craftbuild {
     template <typename T>

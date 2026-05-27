@@ -195,15 +195,15 @@
     <ClCompile Include="misc\ptr.cppm">
       <FileType>Document</FileType>
     </ClCompile>
+    <ClCompile Include="misc\range.cppm" />
     <ClCompile Include="misc\str.cppm" />
-    <ClCompile Include="misc\interger.cppm" />
+    <ClCompile Include="misc\number.cppm" />
     <ClInclude Include="includes.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="game\player\player.cpp" />
     <ClCompile Include="game\main\main.cpp" />
-    <ClCompile Include="misc\interger.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

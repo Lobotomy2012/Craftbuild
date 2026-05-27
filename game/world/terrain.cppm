@@ -9,7 +9,7 @@ module;
 export module game.world.terrain;
 
 import misc.ptr;
-import misc.interger;
+import misc.number;
 
 export namespace craftbuild {
     struct WorldGenerationContext {
@@ -91,7 +91,7 @@ export namespace craftbuild {
         virtual HeightProviderType get_type() const = 0;
     };
 
-    using HeightProviderPtr = ptr<const HeightProvider>;
+    using HeightProviderPtr = Ptr<const HeightProvider>;
 
     class ConstantHeight final : public HeightProvider {
     private:

@@ -1,22 +1,16 @@
 module;
 
-#include <godot_cpp/classes/ref_counted.hpp>
 #include <includes.hpp>
 #include <atomic>
 
 export module misc.ptr;
 
-import misc.interger;
+import misc.number;
 import misc.format;
-
-using namespace godot;
 
 export namespace craftbuild {
 	template <typename T>
-	using ref = Ref<T>;
-
-	template <typename T>
-	class ptr {
+	class Ptr {
 		T* __value__;
 		std::atomic<size>* __rc__ = nullptr;
 
@@ -32,16 +26,16 @@ export namespace craftbuild {
 		}
 
 	public:
-		ptr<T>() : __value__(nullptr), __rc__(nullptr) {}
-		ptr<T>(T* x) : __value__(x) { init(); }
-		ptr<T>(const ptr<T>& x) : __value__(x.__value__), __rc__(x.__rc__) { retain(); }
-		ptr<T>(ptr<T>&& x) noexcept : __value__(x.__value__), __rc__(x.__rc__) {
+		Ptr() : __value__(nullptr), __rc__(nullptr) {}
+		Ptr(T* x) : __value__(x) { init(); }
+		Ptr(const Ptr<T>& x) : __value__(x.__value__), __rc__(x.__rc__) { retain(); }
+		Ptr(Ptr<T>&& x) noexcept : __value__(x.__value__), __rc__(x.__rc__) {
 			x.__value__ = nullptr;
 			x.__rc__ = nullptr;
 		}
-		~ptr<T>() { clear(); }
+		~Ptr() { clear(); }
 
-		ptr<T>& operator=(T* x) {
+		Ptr<T>& operator=(T* x) {
 			clear();
 
 			__value__ = x;
@@ -49,7 +43,7 @@ export namespace craftbuild {
 
 			return *this;
 		}
-		ptr<T>& operator=(const ptr<T>& x) {
+		Ptr<T>& operator=(const Ptr<T>& x) {
 			if (this == &x) return *this;
 
 			clear();
@@ -60,7 +54,7 @@ export namespace craftbuild {
 
 			return *this;
 		}
-		ptr<T>& operator=(ptr<T>&& x) noexcept {
+		Ptr<T>& operator=(Ptr<T>&& x) noexcept {
 			if (this == &x) return *this;
 
 			clear();
@@ -125,7 +119,7 @@ export namespace craftbuild {
 			return __value__;
 		}
 
-		friend format&& operator<<(format&& fm, const ptr<T>& d) {
+		friend format&& operator<<(format&& fm, const Ptr<T>& d) {
 			std::move(fm) << d.value();
 			return fm;
 		}

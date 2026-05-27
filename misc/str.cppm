@@ -17,7 +17,8 @@ module;
 
 export module misc.str;
 
-import misc.interger;
+import misc.range;
+import misc.number;
 import misc.hasher;
 
 export namespace craftbuild {
@@ -152,7 +153,7 @@ export namespace craftbuild {
             }
 
             // MSB-first
-            for (int i = n - 1; i > 0; --i) {
+            for (auto i : range<int>(n - 1, 0)) {
                 append(chunks[i] | 0x80); // continuation
             }
             append(chunks[0]); // last byte
@@ -229,7 +230,7 @@ export namespace craftbuild {
         Str& operator+=(const std::string& s) { encode(to_u32(s)); return *this; }
         Str& operator+=(const Str& s) {
             expect(s.__len__);
-            for (size_t i = 0; i < s.__len__; ++i) {
+            for (auto i : range<size>(s.__len__)) {
                 append(s.__value__[i]);
             }
             return *this;
@@ -237,7 +238,7 @@ export namespace craftbuild {
         Str& operator+=(Str&& s) noexcept {
             if (this == &s) return *this;
             expect(s.__len__);
-            for (size_t i = 0; i < s.__len__; ++i) {
+            for (auto i : range<size>(s.__len__)) {
                 append(std::move(s.__value__[i]));
             }
             s.clear();
@@ -250,10 +251,8 @@ export namespace craftbuild {
                 return *this;
             }
             Str original(*this);
-            expect(__len__ * n);
-            for (size i = 1; i < n; ++i) {
-                *this += original;
-            }
+            expect(__len__ * (n - 1));
+            for (auto i : range<size>(n)) *this += original;
             return *this;
         }
 
@@ -278,7 +277,7 @@ export namespace craftbuild {
             if (not __value__ and not s.__value__) return true;
             else if (not __value__ or not s.__value__) return false;
 
-            for (size_t i = 0; i < __len__; ++i) {
+            for (auto i : range<size>(__len__)) {
                 if (__value__[i] != s.__value__[i]) return false;
             }
             return true;
@@ -389,7 +388,7 @@ export namespace craftbuild {
 
             size hash = FNV_OFFSET;
 
-            for (size_t i = 0; i < str.__len__; ++i) {
+            for (auto i : range<size>(str.__len__)) {
                 hash ^= str.__value__[i];
                 hash *= FNV_PRIME;
             }

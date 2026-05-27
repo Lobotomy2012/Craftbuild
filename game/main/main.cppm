@@ -23,7 +23,8 @@ export module game.main;
 import misc.ptr;
 import misc.str;
 import misc.dict;
-import misc.interger;
+import misc.range;
+import misc.number;
 import misc.format;
 import game.pos;
 import game.core;
@@ -43,11 +44,11 @@ export namespace craftbuild {
         GDCLASS(Main, Node3D)
 
     private:
-        Dict<Pos<int32>, ptr<Chunk>> chunks;
+        Dict<Pos<int32>, Ptr<Chunk>> chunks;
         mutable std::shared_mutex chunks_mutex;
 
-        ref<FastNoiseLite> noise;
-        ref<ShaderMaterial> world_material;
+        Ref<FastNoiseLite> noise;
+        Ref<ShaderMaterial> world_material;
         std::atomic<int32> world_seed = 0;
         Str world_name = "My World";
 
@@ -85,7 +86,7 @@ export namespace craftbuild {
         none _ready() override;
         none _process(float64 delta) override;
         none _notification(int p_what);
-        none _input(const ref<InputEvent>& event) override;
+        none _input(const Ref<InputEvent>& event) override;
         
         none setup_voxel_material();
 
@@ -93,12 +94,12 @@ export namespace craftbuild {
         none start_redstone_thread();
         none start_scheduler_thread();
         none submit_jobs();
-        ptr<Chunk> get_or_create_chunk(const Pos<int>& chunk_pos);
-        none create_chunk_collision(ptr<Chunk> chunk, const PackedVector3Array& collision_faces);
-        none update_chunk_mesh(ptr<Chunk> chunk, ref<ArrayMesh> mesh, PackedVector3Array& collision_faces);
+        Ptr<Chunk> get_or_create_chunk(const Pos<int>& chunk_pos);
+        none create_chunk_collision(Ptr<Chunk> chunk, const PackedVector3Array& collision_faces);
+        none update_chunk_mesh(Ptr<Chunk> chunk, Ref<ArrayMesh> mesh, PackedVector3Array& collision_faces);
         none unload_distant_chunks(int p_cx, int p_cz);
 
-        ptr<Chunk> get_chunk(int cx, int cz);
+        Ptr<Chunk> get_chunk(int cx, int cz);
         uint32 get_global_block_id(int wx, int wy, int wz);
         none set_global_block_id(uint32 block_id, int wx, int wy, int wz);
 

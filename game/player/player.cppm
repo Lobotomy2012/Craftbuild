@@ -10,7 +10,8 @@ module;
 export module game.player;
 
 import misc.ptr;
-import misc.interger;
+import misc.range;
+import misc.number;
 import misc.format;
 import game.core;
 import game.block;
@@ -56,7 +57,7 @@ export namespace craftbuild {
         none _ready() override;
         none _process(float64 delta) override;
         none _physics_process(float64 delta) override;
-        none _input(const ref<InputEvent>& event) override;
+        none _input(const Ref<InputEvent>& event) override;
 
         Dictionary raycast_block(float max_distance = 5.0f);
 

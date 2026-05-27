@@ -7,7 +7,7 @@ module;
 export module misc.format;
 
 import misc.str;
-import misc.interger;
+import misc.number;
 
 export namespace craftbuild {
 	inline Str time2str(const std::tm& tm, const bool with_date = false) {
