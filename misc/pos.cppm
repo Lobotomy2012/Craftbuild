@@ -6,7 +6,7 @@ module;
 #include <includes.hpp>
 #include <xhash>
 
-export module game.pos;
+export module misc.pos;
 
 import misc.number;
 import misc.hasher;

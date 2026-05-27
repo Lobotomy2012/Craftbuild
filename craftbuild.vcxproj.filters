@@ -59,7 +59,7 @@
     <ClCompile Include="misc\ptr.cppm">
       <Filter>Header Files</Filter>
     </ClCompile>
-    <ClCompile Include="game\pos.cppm">
+    <ClCompile Include="misc\pos.cppm">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="game\player\skin_manager.cpp">

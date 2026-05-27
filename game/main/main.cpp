@@ -36,11 +36,11 @@ namespace craftbuild {
         TagRegistry::register_tag("face");
         TagRegistry::register_tag("transparent");
 
-        BlockRegistry::register_block<AirBlock>("Air", "");
-        BlockRegistry::register_block<GrassBlock>("Grass Block", "grass_block.png");
-        BlockRegistry::register_block<DirtBlock>("Dirt", "dirt.png");
-        BlockRegistry::register_block<StoneBlock>("Stone", "stone.png");
-        BlockRegistry::register_block<BedrockBlock>("Bedrock", "bedrock.png");
+        BlockRegistry::register_block<AirBlock>    ("Air",         "");
+        BlockRegistry::register_block<GrassBlock>  ("Grass Block", "grass_block.png");
+        BlockRegistry::register_block<DirtBlock>   ("Dirt",        "dirt.png");
+        BlockRegistry::register_block<StoneBlock>  ("Stone",       "stone.png");
+        BlockRegistry::register_block<BedrockBlock>("Bedrock",     "bedrock.png");
 
         Biome plains;
         plains.base_height = 5.0f;
@@ -636,7 +636,7 @@ namespace craftbuild {
 
         char* current_version = new char[version_len + 1]; current_version[version_len] = '\0';
         ifs.read(current_version, sizeof(char) * version_len);
-        if (strcmp(current_version, version)) log<LogType::WARNING>(format{} << "Save version" << "(" << current_version << ")" <<" mismatch with current version" << "(" << version << ")");
+        if (strcmp(current_version, version)) log<LogType::WARNING>(format{} << "Save version" << "(" << current_version << ")" << " mismatch with current version (" << version << ")");
         delete[] current_version;
 
         uint32 seed = 0;

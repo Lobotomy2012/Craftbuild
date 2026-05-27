@@ -13,7 +13,7 @@ import misc.ptr;
 import misc.str;
 import misc.dict;
 import misc.number;
-import game.pos;
+import misc.pos;
 import game.core;
 import game.texture.asset_loader;
 

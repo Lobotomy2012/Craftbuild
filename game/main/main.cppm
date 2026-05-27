@@ -26,7 +26,7 @@ import misc.dict;
 import misc.range;
 import misc.number;
 import misc.format;
-import game.pos;
+import misc.pos;
 import game.core;
 import game.block;
 import game.logger;

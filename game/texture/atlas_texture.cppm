@@ -51,12 +51,8 @@ export namespace craftbuild {
             atlas_texture.instantiate();
             Error err = atlas_texture->create_from_images(images);
 
-            if (err != OK) {
-                log<LogType::ERROR>(format{} << "Error: create_from_images failed code: " << (int)err);
-            }
-            else {
-                log<LogType::VERBOSE>(format{} << "TextureArray build success: " << current_layer << " layers.");
-            }
+            if (err != OK) log<LogType::ERROR>(format{} << "Error: create_from_images failed code: " << (int)err);
+            else log<LogType::VERBOSE>(format{} << "TextureArray build success: " << current_layer << " layers.");
         }
 	};
 }

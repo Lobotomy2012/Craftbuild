@@ -19,7 +19,7 @@ import misc.str;
 import misc.dict;
 import misc.range;
 import misc.number;
-import game.pos;
+import misc.pos;
 import game.block;
 import game.logger;
 import game.world.biome;
@@ -248,10 +248,10 @@ export namespace craftbuild {
         }
 
         none generate_terrain(int32 seed, Ref<FastNoiseLite> noise) {
-            const uint32 AIR   = BlockRegistry::get_id("Air");
-            const uint32 GRASS = BlockRegistry::get_id("Grass Block");
-            const uint32 DIRT  = BlockRegistry::get_id("Dirt");
-            const uint32 STONE = BlockRegistry::get_id("Stone");
+            const uint32 AIR     = BlockRegistry::get_id("Air");
+            const uint32 GRASS   = BlockRegistry::get_id("Grass Block");
+            const uint32 DIRT    = BlockRegistry::get_id("Dirt");
+            const uint32 STONE   = BlockRegistry::get_id("Stone");
             const uint32 BEDROCK = BlockRegistry::get_id("Bedrock");
 
             auto new_blocks = std::make_unique<BlockStorage[][SIZE_Y][SIZE_Z]>(SIZE_X);

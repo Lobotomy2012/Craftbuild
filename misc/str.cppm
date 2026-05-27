@@ -21,95 +21,95 @@ import misc.range;
 import misc.number;
 import misc.hasher;
 
+inline std::u32string ptr_to_hex(const none* ptr) noexcept {
+    uintptr_t value = (uintptr_t)ptr;
+
+    if (value == 0) return U"0x0";
+
+    byte32 buffer[2 + sizeof(uintptr_t) * 2 + 1]; // "0x" + hex + null
+    int i = sizeof(buffer) - 1;
+    buffer[i--] = U'\0';
+
+    const byte32* hex = U"0123456789ABCDEF";
+
+    while (value > 0) {
+        buffer[i--] = hex[value & 0xF];
+        value >>= 4;
+    }
+
+    buffer[i--] = U'x';
+    buffer[i] = U'0';
+
+    return &buffer[i];
+}
+
+inline std::u32string to_u32(const std::string& s) {
+    std::u32string out;
+    size i = 0;
+
+    while (i < s.size()) {
+        uint32 cp = 0;
+        unsigned char c = s[i];
+
+        if (c < 0x80) { // 1 byte
+            cp = c;
+            i += 1;
+        }
+        else if ((c >> 5) == 0x6) { // 2 bytes
+            cp = ((c & 0x1F) << 6) |
+                (s[i + 1] & 0x3F);
+            i += 2;
+        }
+        else if ((c >> 4) == 0xE) { // 3 bytes
+            cp = ((c & 0x0F) << 12) |
+                ((s[i + 1] & 0x3F) << 6) |
+                (s[i + 2] & 0x3F);
+            i += 3;
+        }
+        else if ((c >> 3) == 0x1E) { // 4 bytes
+            cp = ((c & 0x07) << 18) |
+                ((s[i + 1] & 0x3F) << 12) |
+                ((s[i + 2] & 0x3F) << 6) |
+                (s[i + 3] & 0x3F);
+            i += 4;
+        }
+        else throw std::invalid_argument("invalid UTF-8");
+
+        out.push_back(cp);
+    }
+
+    return out;
+}
+
+// UTF-8 ENCODE
+inline none append_utf8(std::string& out, uint32 cp) {
+    // basic validation
+    if (cp > 0x10FFFF or (cp >= 0xD800 && cp <= 0xDFFF)) {
+        out += "?";
+        return;
+    }
+
+    if (cp <= 0x7F) {
+        out.push_back(static_cast<byte>(cp));
+    }
+    else if (cp <= 0x7FF) {
+        out.push_back(static_cast<byte>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<byte>(0x80 | (cp & 0x3F)));
+    }
+    else if (cp <= 0xFFFF) {
+        out.push_back(static_cast<byte>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<byte>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<byte>(0x80 | (cp & 0x3F)));
+    }
+    else {
+        out.push_back(static_cast<byte>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<byte>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<byte>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<byte>(0x80 | (cp & 0x3F)));
+    }
+}
+
 export namespace craftbuild {
-    inline std::u32string ptr_to_hex(const none* ptr) noexcept {
-        uintptr_t value = (uintptr_t)ptr;
-
-        if (value == 0) return U"0x0";
-
-        byte32 buffer[2 + sizeof(uintptr_t) * 2 + 1]; // "0x" + hex + null
-        int i = sizeof(buffer) - 1;
-        buffer[i--] = U'\0';
-
-        const byte32* hex = U"0123456789ABCDEF";
-
-        while (value > 0) {
-            buffer[i--] = hex[value & 0xF];
-            value >>= 4;
-        }
-
-        buffer[i--] = U'x';
-        buffer[i] = U'0';
-
-        return &buffer[i];
-    }
-
-    inline std::u32string to_u32(const std::string& s) {
-        std::u32string out;
-        size i = 0;
-
-        while (i < s.size()) {
-            uint32 cp = 0;
-            unsigned char c = s[i];
-
-            if (c < 0x80) { // 1 byte
-                cp = c;
-                i += 1;
-            }
-            else if ((c >> 5) == 0x6) { // 2 bytes
-                cp = ((c & 0x1F) << 6) |
-                    (s[i + 1] & 0x3F);
-                i += 2;
-            }
-            else if ((c >> 4) == 0xE) { // 3 bytes
-                cp = ((c & 0x0F) << 12) |
-                    ((s[i + 1] & 0x3F) << 6) |
-                    (s[i + 2] & 0x3F);
-                i += 3;
-            }
-            else if ((c >> 3) == 0x1E) { // 4 bytes
-                cp = ((c & 0x07) << 18) |
-                    ((s[i + 1] & 0x3F) << 12) |
-                    ((s[i + 2] & 0x3F) << 6) |
-                    (s[i + 3] & 0x3F);
-                i += 4;
-            }
-            else throw std::invalid_argument("invalid UTF-8");
-
-            out.push_back(cp);
-        }
-
-        return out;
-    }
-
-    // UTF-8 ENCODE
-    inline none append_utf8(std::string& out, uint32 cp) {
-        // basic validation
-        if (cp > 0x10FFFF or (cp >= 0xD800 && cp <= 0xDFFF)) {
-            out += "?";
-            return;
-        }
-
-        if (cp <= 0x7F) {
-            out.push_back(static_cast<byte>(cp));
-        }
-        else if (cp <= 0x7FF) {
-            out.push_back(static_cast<byte>(0xC0 | (cp >> 6)));
-            out.push_back(static_cast<byte>(0x80 | (cp & 0x3F)));
-        }
-        else if (cp <= 0xFFFF) {
-            out.push_back(static_cast<byte>(0xE0 | (cp >> 12)));
-            out.push_back(static_cast<byte>(0x80 | ((cp >> 6) & 0x3F)));
-            out.push_back(static_cast<byte>(0x80 | (cp & 0x3F)));
-        }
-        else {
-            out.push_back(static_cast<byte>(0xF0 | (cp >> 18)));
-            out.push_back(static_cast<byte>(0x80 | ((cp >> 12) & 0x3F)));
-            out.push_back(static_cast<byte>(0x80 | ((cp >> 6) & 0x3F)));
-            out.push_back(static_cast<byte>(0x80 | (cp & 0x3F)));
-        }
-    }
-
     class Str {
         uint8* __value__;
         size __len__;
@@ -183,13 +183,13 @@ export namespace craftbuild {
 
     public:
         Str() : __value__(nullptr), __len__(0), __space__(0) {}
-        Str(int64 i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
-        Str(int i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
-        Str(uint64 i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
-        Str(unsigned int i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
-        Str(float64 i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
-        Str(const void* v) : __value__(nullptr), __len__(0), __space__(0) { encode(ptr_to_hex(v)); }
-        Str(const byte32* c) : __value__(nullptr), __len__(0), __space__(0) { encode(std::u32string(c)); }
+        explicit Str(int64 i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
+        explicit Str(int i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
+        explicit Str(uint64 i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
+        explicit Str(unsigned int i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
+        explicit Str(float64 i) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(std::to_string(i))); }
+        explicit Str(const void* v) : __value__(nullptr), __len__(0), __space__(0) { encode(ptr_to_hex(v)); }
+        Str(const byte32* c) : __value__(nullptr), __len__(0), __space__(0) { encode(c); }
         Str(const char* s) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(s)); }
         Str(const std::u32string& s) : __value__(nullptr), __len__(0), __space__(0) { encode(s); }
         Str(const std::string& s) : __value__(nullptr), __len__(0), __space__(0) { encode(to_u32(s)); }
@@ -268,7 +268,7 @@ export namespace craftbuild {
         uint8& operator[](size pos) { return __value__[pos]; }
 
         operator bool() const {
-            return *this != "";
+            return *this != U"";
         }
 
         bool operator==(const Str& s) const {
@@ -305,7 +305,6 @@ export namespace craftbuild {
         void expect(size extra) {
             size needed = __len__ + extra;
             if (not needed) needed = 8;
-            if (__space__ >= needed) return;
             archive(needed);
         }
 

@@ -39,27 +39,27 @@ export namespace craftbuild {
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, const byte* s) {
-			f.__buffer__ += Str(s);
+			f.__buffer__ += s;
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, int64 i) {
-			f.__buffer__ += std::to_string(i);
+			f.__buffer__ += Str(i);
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, int i) {
-			f.__buffer__ += std::to_string(i);
+			f.__buffer__ += Str(i);
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, uint64 i) {
-			f.__buffer__ += std::to_string(i);
+			f.__buffer__ += Str(i);
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, unsigned int i) {
-			f.__buffer__ += std::to_string(i);
+			f.__buffer__ += Str(i);
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, float64 i) {
-			f.__buffer__ += std::to_string(i);
+			f.__buffer__ += Str(i);
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, bool b) {
@@ -67,7 +67,7 @@ export namespace craftbuild {
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, const void* v) {
-			f.__buffer__ += v;
+			f.__buffer__ += Str(v);
 			return std::move(f);
 		}
 		friend format&& operator<<(format&& f, const std::tm& tm) {
