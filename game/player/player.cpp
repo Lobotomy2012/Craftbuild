@@ -87,6 +87,7 @@ namespace craftbuild {
 
         static bool gamemode_toggled = false;
 
+        hit = raycast_block();
         Input* input = Input::get_singleton();
 
         if (input->is_key_pressed(KEY_F3) and input->is_key_pressed(KEY_F4)) {
@@ -183,42 +184,56 @@ namespace craftbuild {
                 if (mb->get_button_index() == MOUSE_BUTTON_WHEEL_DOWN) cycle_hotbar(1);
                 
                 // Mouse click
+                bool mid = mb->get_button_index() == MOUSE_BUTTON_MIDDLE;
                 bool left = mb->get_button_index() == MOUSE_BUTTON_LEFT;
                 bool right = mb->get_button_index() == MOUSE_BUTTON_RIGHT;
-                if (left or right) {
-                    Dictionary hit = raycast_block();
-                    uint32 AIR = BlockRegistry::get_id("Air");
 
-                    if (not hit.is_empty()) {
-                        Vector3 hit_pos = hit["position"];
-                        Vector3 normal = hit["normal"];
+                if (not hit.is_empty()) {
+                    const Vector3 hit_pos = hit["position"];
+                    const Vector3 normal = hit["normal"];
 
-                        Vector3 break_pos_float = hit_pos - (normal * 0.001f);
-                        Vector3i break_block_pos = Vector3i(break_pos_float.floor());
+                    const Vector3 pos_float = hit_pos - (normal * 0.001f);
+                    Vector3i block_pos = Vector3i(pos_float.floor());
 
-                        Vector3 place_pos_float = hit_pos + (normal * 0.001f);
-                        Vector3i place_block_pos = Vector3i(place_pos_float.floor());
-                        uint32 target_block_id = world->get_global_block_id(break_block_pos.x, break_block_pos.y, break_block_pos.z);
+                    uint32 target_block_id = world->get_global_block_id(block_pos.x, block_pos.y, block_pos.z);
+                    log<LogType::INFO>(format{} << "Looking at block id: " << target_block_id << " at (" << block_pos.x << ", " << block_pos.y << ", " << block_pos.z << ")");
+                    
+                    if (mid) {
+                        hotbar[selected_slot] = target_block_id;
+                    }
+                    if (left or right) {
+                        uint32 AIR = BlockRegistry::get_id("Air");
+                        uint32 block = get_selected_block_id();
 
-                        log<LogType::INFO>(format{} << "Looking at block id: " << target_block_id << " at (" << break_block_pos.x << ", " << break_block_pos.y << ", " << break_block_pos.z << ")");
+                        if (left) world->set_global_block_id(AIR, block_pos.x, block_pos.y, block_pos.z);
+                        if (right and block != AIR) {
+                            Face face = get_face(normal);
+                            switch (face) {
+                            case Face::TOP:    block_pos.y += 1;  break;
+                            case Face::BOTTOM: block_pos.y += -1; break;
+                            case Face::LEFT:   block_pos.x += 1;  break;
+                            case Face::RIGHT:  block_pos.x += -1; break;
+                            case Face::FRONT:  block_pos.z += 1;  break;
+                            case Face::BACK:   block_pos.z += -1; break;
+                            }
+                            world->set_global_block_id(block, block_pos.x, block_pos.y, block_pos.z);
+                        }
 
-                        auto block = get_selected_block_id();
-                        if (left)                   world->set_global_block_id(AIR, break_block_pos.x, break_block_pos.y, break_block_pos.z);
-                        if (right and block != AIR) world->set_global_block_id(block, break_block_pos.x, break_block_pos.y, break_block_pos.z);
-
-                        const int cx = static_cast<int>(std::floor((float32)break_block_pos.x / Chunk::SIZE_X));
-                        const int cz = static_cast<int>(std::floor((float32)break_block_pos.z / Chunk::SIZE_Z));
+                        const int cx = static_cast<int>(std::floor((float32)block_pos.x / Chunk::SIZE_X));
+                        const int cz = static_cast<int>(std::floor((float32)block_pos.z / Chunk::SIZE_Z));
                         if (auto chunk = world->get_chunk(cx, cz)) {
                             chunk.value().dirty.store(true, std::memory_order_release);
                             chunk.value().mesh_ready.store(false, std::memory_order_release);
                             chunk.value().collision_built.store(false, std::memory_order_release);
 
-                            Pos<int> neighbor_offsets[4] = { {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1} };
-                            for (const auto& offset : neighbor_offsets) {
-                                if (auto neighbor = world->get_chunk(cx + offset.x, cz + offset.z)) {
-                                    neighbor.value().dirty.store(true, std::memory_order_release);
-                                    neighbor.value().mesh_ready.store(false, std::memory_order_release);
-                                    neighbor.value().collision_built.store(false, std::memory_order_release);
+                            if (block_pos.x >= 0 or block_pos.z >= 0 or block_pos.x < Chunk::SIZE_X or block_pos.z < Chunk::SIZE_Z) {
+                                Pos<int> neighbor_offsets[4] = { {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1} };
+                                for (const auto& offset : neighbor_offsets) {
+                                    if (auto neighbor = world->get_chunk(cx + offset.x, cz + offset.z)) {
+                                        neighbor.value().dirty.store(true, std::memory_order_release);
+                                        neighbor.value().mesh_ready.store(false, std::memory_order_release);
+                                        neighbor.value().collision_built.store(false, std::memory_order_release);
+                                    }
                                 }
                             }
                         }
@@ -251,6 +266,16 @@ namespace craftbuild {
         query->set_collision_mask(1); 
 
         return space_state->intersect_ray(query);
+    }
+
+    Face Player::get_face(Pos<real> n) {
+        if (n == Pos<real>(0, 1, 0)) return Face::TOP;
+        if (n == Pos<real>(0, -1, 0)) return Face::BOTTOM;
+        if (n == Pos<real>(1, 0, 0)) return Face::LEFT;
+        if (n == Pos<real>(-1, 0, 0)) return Face::RIGHT;
+        if (n == Pos<real>(0, 0, 1)) return Face::FRONT;
+        if (n == Pos<real>(0, 0, -1)) return Face::BACK;
+        return Face::TOP;
     }
 
     none Player::cycle_hotbar(int dir) {

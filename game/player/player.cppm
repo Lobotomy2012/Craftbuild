@@ -9,6 +9,7 @@ module;
 
 export module game.player;
 
+import misc.pos;
 import misc.ptr;
 import misc.range;
 import misc.number;
@@ -16,6 +17,7 @@ import misc.format;
 import game.core;
 import game.block;
 import game.logger;
+import game.world.chunk;
 
 using namespace godot;
 
@@ -50,6 +52,10 @@ export namespace craftbuild {
         // World
         none* world_ptr = nullptr;
 
+        // Gameplay
+        int8 hp = 20;
+        Dictionary hit;
+
     protected:
         static none _bind_methods();
 
@@ -60,6 +66,7 @@ export namespace craftbuild {
         none _input(const Ref<InputEvent>& event) override;
 
         Dictionary raycast_block(float max_distance = 5.0f);
+        Face get_face(Pos<real> n);
 
         none cycle_hotbar(int dir);
         none select_slot(int slot);

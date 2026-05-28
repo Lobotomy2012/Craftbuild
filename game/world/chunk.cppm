@@ -203,9 +203,9 @@ export namespace craftbuild {
         }
 
         template <bool lock = true>
-        uint32 get_block(const Pos<uint8>& pos) const {}
+        uint32 get_block(const Pos<uint8>& pos) const;
         template <bool lock = true>
-		std::pair<uint32, uint16> get_tag(const Pos<uint8>& pos) const {}
+        std::pair<uint32, uint16> get_tag(const Pos<uint8>& pos) const;
 
         template<>
         uint32 get_block<true>(const Pos<uint8>& pos) const {
