@@ -14,7 +14,7 @@ Indev
 - Generate terrain
 - Save/Load world
 - Collision, Camera, Skin
-- Break block
+- Break/place block
 - Menu
 - Pause screen
 - Setting screen
@@ -23,7 +23,6 @@ Indev
 
 # Coming soon
 - Hotbar
-- Place block
 - Cloud
 - Weather
 - Multiplayer and networking

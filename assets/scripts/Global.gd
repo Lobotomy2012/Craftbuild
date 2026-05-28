@@ -11,6 +11,9 @@ var stack_scene = []
 func go_to(path: String):
 	stack_scene.push_back(get_tree().current_scene.scene_file_path)
 	get_tree().change_scene_to_file(path)
+	
+func teleport_to(path: String):
+	get_tree().change_scene_to_file(path)
 
 func ret_last_scene():
 	if stack_scene.is_empty(): return

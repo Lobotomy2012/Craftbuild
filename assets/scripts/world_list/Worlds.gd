@@ -18,7 +18,7 @@ func create_button(world_name: String) -> void:
 func load_folders() -> void:
 	var dir = DirAccess.open(Global.world_saves)
 	if dir == null:
-		Global.go_to("res://scenes/CreateWorld.tscn")
+		Global.teleport_to("res://scenes/create_world.tscn")
 		return
 
 	dir.list_dir_begin()
