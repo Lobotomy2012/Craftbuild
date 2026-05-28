@@ -3,6 +3,8 @@ module;
 #include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/input_event.hpp>
+#include <godot_cpp/classes/mesh_instance3d.hpp>
+#include <godot_cpp/classes/shader_material.hpp>
 #include <godot_cpp/classes/character_body3d.hpp>
 
 #include <includes.hpp>
@@ -18,11 +20,12 @@ import game.core;
 import game.block;
 import game.logger;
 import game.world.chunk;
+import game.texture.atlas_texture;
 
 using namespace godot;
 
 export namespace craftbuild {
-    enum class Gamemode : uint8_t { Survival, Creative, Adventure, Spectator };
+    enum class Gamemode : uint8_t { SURVIVAL, CREATIVE, ADVENTURE, SPECTATOR };
 
     class Player : public CharacterBody3D {
         GDCLASS(Player, CharacterBody3D)
@@ -31,17 +34,16 @@ export namespace craftbuild {
         // Movement
         float32 speed = 4.0f;
         float32 gravity = 24.0f;
-        float32 jump_velocity = 7.5f;
+        float32 jump_velocity = 8.0f;
         bool is_grounded = false;
         bool can_fly = false;
         bool jump_was_pressed = false;
-        bool double_jump_armed = false;
         bool running = false;
-        Gamemode gamemode = Gamemode::Survival;
+        Gamemode gamemode = Gamemode::SURVIVAL;
 
         // Hotbar
         inline static constexpr uint8 HOTBAR_SIZE = 9;
-        std::array<uint32, HOTBAR_SIZE> hotbar;
+        uint32 hotbar[HOTBAR_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
         uint8 selected_slot = 0;
 
         // Camera
@@ -55,6 +57,7 @@ export namespace craftbuild {
         // Gameplay
         int8 hp = 20;
         Dictionary hit;
+        MeshInstance3D* selection_box;
 
     protected:
         static none _bind_methods();
@@ -65,6 +68,7 @@ export namespace craftbuild {
         none _physics_process(float64 delta) override;
         none _input(const Ref<InputEvent>& event) override;
 
+        Ref<ShaderMaterial> create_selection_box_material();
         Dictionary raycast_block(float max_distance = 5.0f);
         Face get_face(Pos<real> n);
 

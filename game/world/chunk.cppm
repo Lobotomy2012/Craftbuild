@@ -53,7 +53,7 @@ export namespace craftbuild {
         inline static constexpr uint8 SIZE_Z = 16;
 
         Dict<uint8, uint32> block_ids;
-        Dict<uint8, std::pair<uint32, uint16>> tag_ids;
+        Dict<uint8, std::pair<uint32, size>> tag_ids;
         Dict<Pos<uint8>, BlockStorageFull> complex_blocks;
         BlockStorage blocks[SIZE_X][SIZE_Y][SIZE_Z] = {};
 
@@ -165,13 +165,14 @@ export namespace craftbuild {
             block_ids.emplace(block_ids.size(), block_id);
         }
 
-        none tag_block(const Pos<uint8>& pos, const Str& tag, uint16 tag_data = 0) {
+        none tag_block(const Pos<uint8>& pos, const Str& tag, size tag_data = 0) {
             tag_block(pos, TagRegistry::get_id(tag), tag_data);
         }
-        none tag_block(const Pos<uint8>& pos, uint32 tag_id, uint16 tag_data = 0) {
+        none tag_block(const Pos<uint8>& pos, uint32 tag_id, size tag_data = 0) {
             std::unique_lock lock(data_mutex);
             if (tag_ids.size() >= 256) {
-				complex_blocks[pos].tag = tag_id;
+                complex_blocks[pos].tag = tag_id;
+                complex_blocks[pos].tag_data = tag_data;
                 return;
             }
 
@@ -184,28 +185,28 @@ export namespace craftbuild {
             }
 
             blocks[pos.x][pos.y][pos.z].tag = tag_ids.size();
-            tag_ids.emplace(tag_ids.size(), std::make_pair(tag_id, (uint16)0));
+            tag_ids.emplace(tag_ids.size(), std::make_pair(tag_id, tag_data));
         }
 
-        bool has_tag(const Pos<uint8>& pos, const Str& tag) const {
-			return has_tag(pos, TagRegistry::get_id(tag));
+        bool has_tag(const Pos<uint8>& pos, const Str& tag, size tag_data = 0) const {
+			return has_tag(pos, TagRegistry::get_id(tag), tag_data);
         }
-        bool has_tag(const Pos<uint8>& pos, uint32 tag_id) const {
+        bool has_tag(const Pos<uint8>& pos, uint32 tag_id, size tag_data = 0) const {
             std::shared_lock lock(data_mutex);
             if (pos.x >= SIZE_X or pos.y >= SIZE_Y or pos.z >= SIZE_Z) return false;
 
             if (tag_ids.size() >= 256) {
-                return complex_blocks.at(pos).tag == tag_id;
+                return complex_blocks.at(pos).tag == tag_id and complex_blocks.at(pos).tag_data == tag_data;
             }
 
             auto& block_tag = blocks[pos.x][pos.y][pos.z].tag;
-			return tag_ids.find(block_tag) != tag_ids.end() and tag_ids.at(block_tag).first == tag_id;
+			return tag_ids.find(block_tag) != tag_ids.end() and tag_ids.at(block_tag) == std::make_pair(tag_id, tag_data);
         }
 
         template <bool lock = true>
         uint32 get_block(const Pos<uint8>& pos) const;
         template <bool lock = true>
-        std::pair<uint32, uint16> get_tag(const Pos<uint8>& pos) const;
+        std::pair<uint32, size> get_tag(const Pos<uint8>& pos) const;
 
         template<>
         uint32 get_block<true>(const Pos<uint8>& pos) const {
@@ -218,14 +219,14 @@ export namespace craftbuild {
             return block_ids.find(blocks[pos.x][pos.y][pos.z].block_id) != block_ids.end() ? block_ids.at(blocks[pos.x][pos.y][pos.z].block_id) : 0;
         }
         template<>
-        std::pair<uint32, uint16> get_tag<true>(const Pos<uint8>& pos) const {
+        std::pair<uint32, size> get_tag<true>(const Pos<uint8>& pos) const {
             std::shared_lock lock(data_mutex);
             if (pos.x >= SIZE_X or pos.y >= SIZE_Y or pos.z >= SIZE_Z) return std::make_pair(0, 0);
             auto it = complex_blocks.find(pos);
             if (it != complex_blocks.end()) {
                 return std::make_pair(it->second.tag, it->second.tag_data);
             }
-            return tag_ids.find(blocks[pos.x][pos.y][pos.z].tag) != tag_ids.end() ? tag_ids.at(blocks[pos.x][pos.y][pos.z].tag) : std::make_pair(0U, (uint16)0);
+            return tag_ids.find(blocks[pos.x][pos.y][pos.z].tag) != tag_ids.end() ? tag_ids.at(blocks[pos.x][pos.y][pos.z].tag) : std::make_pair(0U, (size)0);
         }
 
         template<>
@@ -238,13 +239,13 @@ export namespace craftbuild {
             return block_ids.find(blocks[pos.x][pos.y][pos.z].block_id) != block_ids.end() ? block_ids.at(blocks[pos.x][pos.y][pos.z].block_id) : 0;
         }
         template<>
-        std::pair<uint32, uint16> get_tag<false>(const Pos<uint8>& pos) const {
+        std::pair<uint32, size> get_tag<false>(const Pos<uint8>& pos) const {
             if (pos.x >= SIZE_X or pos.y >= SIZE_Y or pos.z >= SIZE_Z) return std::make_pair(0, 0);
             auto it = complex_blocks.find(pos);
             if (it != complex_blocks.end()) {
                 return std::make_pair(it->second.tag, it->second.tag_data);
             }
-            return tag_ids.find(blocks[pos.x][pos.y][pos.z].tag) != tag_ids.end() ? tag_ids.at(blocks[pos.x][pos.y][pos.z].tag) : std::make_pair(0U, (uint16)0);
+            return tag_ids.find(blocks[pos.x][pos.y][pos.z].tag) != tag_ids.end() ? tag_ids.at(blocks[pos.x][pos.y][pos.z].tag) : std::make_pair(0U, (size)0);
         }
 
         none generate_terrain(int32 seed, Ref<FastNoiseLite> noise) {
@@ -256,7 +257,7 @@ export namespace craftbuild {
 
             auto new_blocks = std::make_unique<BlockStorage[][SIZE_Y][SIZE_Z]>(SIZE_X);
             Dict<uint8, uint32> new_block_ids;
-            Dict<uint8, std::pair<uint32, uint16>> new_tag_ids;
+            Dict<uint8, std::pair<uint32, size>> new_tag_ids;
             Dict<Pos<uint8>, BlockStorageFull> new_complex_blocks;
 
             auto add_block_unlocked = [&](const Pos<uint8>& pos, uint32 block_id) {
@@ -377,7 +378,7 @@ export namespace craftbuild {
                 if (by < 0 or by >= Chunk::SIZE_Y) return true;
 
                 uint32 id = AIR;
-                std::pair<uint32, uint16> tag = { TRANSPARENT, true };
+                std::pair<uint32, size> tag = { TRANSPARENT, true };
 
                 if (bx >= Chunk::SIZE_X or bx < 0 or bz >= Chunk::SIZE_Z or bz < 0) {
                     uint8 nid = 0;
@@ -401,11 +402,9 @@ export namespace craftbuild {
                 }
 
                 if (id == AIR) return true;
-                if (tag.first == TRANSPARENT) {
-                    const auto& transparent_tags = TagRegistry::get_value(TRANSPARENT);
-                    if (tag.second < transparent_tags.size()) return transparent_tags[tag.second] == true;
-                }
-                return false;
+                if (tag.first != TRANSPARENT) return false;
+
+                return TagRegistry::get_value(TRANSPARENT, tag.second) == true;
             };
 
             auto get_block_layer = [&](int bx, int by, int bz, Face face) -> int {
@@ -439,14 +438,14 @@ export namespace craftbuild {
 
                             const bool a_trans = transparent_or_air(x[0], x[1], x[2]);
                             const bool b_trans = transparent_or_air(x[0] + q[0], x[1] + q[1], x[2] + q[2]);
-                            
+
                             if (a_inside and (not a_trans) and b_trans) {
                                 int layer = get_block_layer(x[0], x[1], x[2], front_faces[d]);
                                 if (layer >= 0) mask[x[u] + x[v] * dims[u]] = { layer, false };
                             }
                             else if (b_inside and a_trans and (not b_trans)) {
                                 int layer = get_block_layer(x[0] + q[0], x[1] + q[1], x[2] + q[2], back_faces[d]);
-                                if (layer >= 0) mask[x[u] + x[v] * dims[u]] = {layer, true};
+                                if (layer >= 0) mask[x[u] + x[v] * dims[u]] = {layer, true };
                             }
                         }
                     }

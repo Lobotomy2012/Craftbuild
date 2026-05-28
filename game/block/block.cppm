@@ -43,18 +43,33 @@ export namespace craftbuild {
         inline static std::vector<TagEntry> tag;
         inline static Dict<Str, uint32> tag2id;
 
-        static none register_tag(const Str& name) {
+        static uint32 register_tag(const Str& name) {
             tag.push_back(name);
-            tag2id[name] = tag.size() - 1;
+            const uint32 tag_size = (uint32)(tag.size() - 1);
+            tag2id[name] = tag_size;
+            return tag_size;
         }
 
-        static none set_value(uint32 tag_id, uint64 value) {
+        static size add_value(uint32 tag_id, uint64 value) {
+            if (tag_id >= tag.size()) return 0;
+            auto& values = tag[tag_id].value;
+            values.push_back(value);
+            return values.size() - 1;
+        }
+
+        static none set_value(uint32 tag_id, size index, uint64 value) {
 			if (tag_id >= tag.size()) return;
-            tag[tag_id].value.push_back(value);
+            auto& values = tag[tag_id].value;
+            if (index >= values.size()) add_value(tag_id, value);
+            else values[index] = value;
         }
 
         static std::vector<uint64>& get_value(uint32 tag_id) {
             return tag[tag_id].value;
+        }
+
+        static uint64& get_value(uint32 tag_id, size index) {
+            return tag[tag_id].value[index];
         }
 
         static Str get_name(uint32 tag_id) {
@@ -75,7 +90,7 @@ export namespace craftbuild {
         virtual ~Block() = default;
         virtual int get_texture_layer(Face face) const = 0;
 
-		virtual std::vector<std::pair<Str, uint64>> init_tags() { return {}; }
+		virtual std::vector<std::pair<Str, size>> init_tags() { return {}; }
 
         static none create_face(Face face, const Vector3& pos, std::vector<Pos<real>>& vertices) {
             switch (face) {
@@ -177,7 +192,7 @@ export namespace craftbuild {
                 texture = AssetLoader::load_block_texture(registry.size(), path, FaceCount::SIX);
             }
 			for (const auto& pair : block.value().init_tags()) {
-				TagRegistry::set_value(TagRegistry::get_id(pair.first), pair.second);
+				TagRegistry::set_value(TagRegistry::get_id(pair.first), pair.second, 0);
 			}
             registry.emplace_back(block, name, texture);
             name2id[name] = registry.size() - 1;
@@ -206,6 +221,6 @@ export namespace craftbuild {
     struct BlockStorageFull {
         uint32 block_id;
         uint32 tag;
-        uint16 tag_data;
+        size tag_data;
     };
 }

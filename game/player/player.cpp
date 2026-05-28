@@ -1,15 +1,18 @@
 module;
 
 #include <godot_cpp/classes/input.hpp>
+#include <godot_cpp/classes/shader.hpp>
 #include <godot_cpp/classes/window.hpp>
 #include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/classes/box_mesh.hpp>
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/input_event.hpp>
+#include <godot_cpp/classes/shader_material.hpp>
 #include <godot_cpp/classes/capsule_shape3d.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
+#include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/classes/character_body3d.hpp>
 #include <godot_cpp/classes/collision_shape3d.hpp>
 #include <godot_cpp/classes/input_event_mouse_motion.hpp>
@@ -68,14 +71,21 @@ namespace craftbuild {
         collision->set_shape(capsule);
         collision->set_position(Vector3(0, 1.0f, 0));
 
-        // Load Skin
+        // Selection box
+        selection_box = memnew(MeshInstance3D);
+        selection_box->set_scale(Vector3(1.001f, 1.001f, 1.001f));
+
+        Ref<BoxMesh> selection_mesh = memnew(BoxMesh);
+        selection_mesh->set_size(Vector3(1.001f, 1.001f, 1.001f));
+
+        selection_box->set_mesh(selection_mesh);
+        selection_box->set_material_override(create_selection_box_material());
+
+        // Load skin
         SkinManager::load_skin(*this, "res://assets/textures/skin/creeper_boy.png");
         
 		// World reference
         world_ptr = Object::cast_to<Main>(get_parent());
-
-        hotbar = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-        selected_slot = 0;
 
         log<LogType::INFO>("Player initialized");
     }
@@ -85,26 +95,24 @@ namespace craftbuild {
         Main* world = static_cast<Main*>(world_ptr);
         if (world->pausing.load(std::memory_order_relaxed)) return;
 
-        static bool gamemode_toggled = false;
-
         hit = raycast_block();
-        Input* input = Input::get_singleton();
-
-        if (input->is_key_pressed(KEY_F3) and input->is_key_pressed(KEY_F4)) {
-            if (not gamemode_toggled) {
-                gamemode = (Gamemode)(((uint8_t)gamemode + 1) % 4);
-                log<LogType::INFO>(format{} << "Changed gamemode to " << (int)gamemode);
-                can_fly = false;
-                double_jump_armed = false;
-                gamemode_toggled = true;
-            }
+        if (hit.is_empty()) {
+            if (selection_box->get_parent() == world) world->remove_child(selection_box);
+            return;
         }
-        else gamemode_toggled = false;
-        if (gamemode == Gamemode::Spectator) can_fly = true;
+        if (selection_box->get_parent() != world) world->add_child(selection_box);
+
+        const Vector3 hit_pos = hit["position"];
+        const Vector3 normal = hit["normal"];
+
+        const Vector3 pos_float = hit_pos - (normal * 0.001f);
+        Pos<int> block_pos = pos_float.floor();
+
+        selection_box->set_position(Vector3(block_pos.x, block_pos.y, block_pos.z) + Vector3(0.5, 0.5, 0.5));
     }
 
     none Player::_physics_process(float64 delta) {
-        if (gamemode == Gamemode::Spectator) return;
+        if (gamemode == Gamemode::SPECTATOR) return;
         if (not camera or not world_ptr) return;
 
 		Main* world = static_cast<Main*>(world_ptr);
@@ -121,15 +129,11 @@ namespace craftbuild {
 
             if (is_grounded) {
                 if (velocity.y < 0.0f) velocity.y = -0.1f;
-                if (not jump_pressed) double_jump_armed = false;
-                if (jump_pressed) {
-                    velocity.y = jump_velocity;
-                    double_jump_armed = gamemode == Gamemode::Creative;
-                }
+                if (jump_pressed) velocity.y = jump_velocity;
+                can_fly = false;
             }
-            else if (gamemode == Gamemode::Creative and double_jump_armed and jump_pressed and not jump_was_pressed) {
+            else if (gamemode == Gamemode::CREATIVE and jump_pressed and not jump_was_pressed) {
                 can_fly = not can_fly;
-                double_jump_armed = false;
                 velocity.y = 0.0f;
             }
             else velocity.y -= gravity * dt;
@@ -168,6 +172,8 @@ namespace craftbuild {
         Main* world = static_cast<Main*>(world_ptr);
         if (world->pausing.load(std::memory_order_relaxed)) return;
 
+        static bool gamemode_toggled = false;
+
         // Mouse look
         if (auto mm = Object::cast_to<InputEventMouseMotion>(event.ptr())) {
             Vector2 rel = mm->get_relative();
@@ -196,11 +202,10 @@ namespace craftbuild {
                     Vector3i block_pos = Vector3i(pos_float.floor());
 
                     uint32 target_block_id = world->get_global_block_id(block_pos.x, block_pos.y, block_pos.z);
-                    log<LogType::INFO>(format{} << "Looking at block id: " << target_block_id << " at (" << block_pos.x << ", " << block_pos.y << ", " << block_pos.z << ")");
+                    log<LogType::VERBOSE>(format{} << "Looking at block id: " << target_block_id << " at (" << block_pos.x << ", " << block_pos.y << ", " << block_pos.z << ")");
                     
-                    if (mid) {
-                        hotbar[selected_slot] = target_block_id;
-                    }
+                    if (mid and gamemode == Gamemode::CREATIVE) hotbar[selected_slot] = target_block_id;
+
                     if (left or right) {
                         uint32 AIR = BlockRegistry::get_id("Air");
                         uint32 block = get_selected_block_id();
@@ -223,23 +228,32 @@ namespace craftbuild {
                         const int cz = static_cast<int>(std::floor((float32)block_pos.z / Chunk::SIZE_Z));
                         if (auto chunk = world->get_chunk(cx, cz)) {
                             chunk.value().dirty.store(true, std::memory_order_release);
-                            chunk.value().mesh_ready.store(false, std::memory_order_release);
-                            chunk.value().collision_built.store(false, std::memory_order_release);
 
                             if (block_pos.x >= 0 or block_pos.z >= 0 or block_pos.x < Chunk::SIZE_X or block_pos.z < Chunk::SIZE_Z) {
                                 Pos<int> neighbor_offsets[4] = { {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1} };
                                 for (const auto& offset : neighbor_offsets) {
-                                    if (auto neighbor = world->get_chunk(cx + offset.x, cz + offset.z)) {
-                                        neighbor.value().dirty.store(true, std::memory_order_release);
-                                        neighbor.value().mesh_ready.store(false, std::memory_order_release);
-                                        neighbor.value().collision_built.store(false, std::memory_order_release);
-                                    }
+                                    if (auto neighbor = world->get_chunk(cx + offset.x, cz + offset.z)) neighbor.value().dirty.store(true, std::memory_order_release);
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+
+        if (auto input = Object::cast_to<InputEventKey>(event.ptr())) {
+            bool is_f3_held = Input::get_singleton()->is_key_pressed(KEY_F3);
+
+            if (input->is_pressed() and input->get_keycode() == KEY_F4 and is_f3_held) {
+                if (not gamemode_toggled) {
+                    gamemode = (Gamemode)(((uint8_t)gamemode + 1) % 4);
+                    log<LogType::INFO>(format{} << "Changed gamemode to " << (int)gamemode);
+                    can_fly = false;
+                    gamemode_toggled = true;
+                }
+            }
+            else if (not input->is_pressed() and input->get_keycode() == KEY_F4) gamemode_toggled = false;
+            if (gamemode == Gamemode::SPECTATOR) can_fly = true;
         }
 
         for (auto i : range<int>(9)) {
@@ -250,6 +264,28 @@ namespace craftbuild {
                 }
             }
         }
+    }
+
+    Ref<ShaderMaterial> Player::create_selection_box_material() {
+        Ref<ShaderMaterial> mat;
+        mat.instantiate();
+
+        Ref<Shader> shader;
+        shader.instantiate();
+        shader->set_code(R"(
+shader_type spatial;
+
+render_mode unshaded, cull_disabled;
+
+void fragment() {
+    ALBEDO = vec3(1.0, 1.0, 1.0);
+    EMISSION = vec3(4.0, 4.0, 4.0);
+    ALPHA = 0.05;
+}
+        )");
+
+        mat->set_shader(shader);
+        return mat;
     }
 
     Dictionary Player::raycast_block(float max_distance) {
@@ -269,11 +305,11 @@ namespace craftbuild {
     }
 
     Face Player::get_face(Pos<real> n) {
-        if (n == Pos<real>(0, 1, 0)) return Face::TOP;
+        if (n == Pos<real>(0, 1, 0))  return Face::TOP;
         if (n == Pos<real>(0, -1, 0)) return Face::BOTTOM;
-        if (n == Pos<real>(1, 0, 0)) return Face::LEFT;
+        if (n == Pos<real>(1, 0, 0))  return Face::LEFT;
         if (n == Pos<real>(-1, 0, 0)) return Face::RIGHT;
-        if (n == Pos<real>(0, 0, 1)) return Face::FRONT;
+        if (n == Pos<real>(0, 0, 1))  return Face::FRONT;
         if (n == Pos<real>(0, 0, -1)) return Face::BACK;
         return Face::TOP;
     }

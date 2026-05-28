@@ -36,11 +36,14 @@ namespace craftbuild {
         TagRegistry::register_tag("face");
         TagRegistry::register_tag("transparent");
 
-        BlockRegistry::register_block<AirBlock>    ("Air",         "");
-        BlockRegistry::register_block<GrassBlock>  ("Grass Block", "grass_block.png");
-        BlockRegistry::register_block<DirtBlock>   ("Dirt",        "dirt.png");
-        BlockRegistry::register_block<StoneBlock>  ("Stone",       "stone.png");
-        BlockRegistry::register_block<BedrockBlock>("Bedrock",     "bedrock.png");
+        BlockRegistry::register_block<Air>          ("Air",           "");
+        BlockRegistry::register_block<Grass>        ("Grass Block",   "grass_block.png");
+        BlockRegistry::register_block<Dirt>         ("Dirt",          "dirt.png");
+        BlockRegistry::register_block<Stone>        ("Stone",         "stone.png");
+        BlockRegistry::register_block<OakPlanks>    ("Oak Planks",    "oak_planks.png");
+        BlockRegistry::register_block<DiamondBlock> ("Diamond Block", "diamond_block.png");
+        BlockRegistry::register_block<DiamondOre>   ("Diamond Ore",   "diamond_ore.png");
+        BlockRegistry::register_block<Bedrock>      ("Bedrock",       "bedrock.png");
 
         Biome plains;
         plains.base_height = 5.0f;
@@ -239,27 +242,28 @@ namespace craftbuild {
         Ref<Shader> shader;
         shader.instantiate();
         shader->set_code(R"(
-            shader_type spatial;
-            render_mode cull_back, depth_draw_opaque, diffuse_burley;
+shader_type spatial;
+render_mode cull_back, depth_draw_opaque, diffuse_burley;
 
-            uniform sampler2DArray u_texture_array : source_color, filter_linear_mipmap;
+uniform sampler2DArray u_texture_array : source_color, filter_linear_mipmap;
+uniform float emissive_strength = 3.0;
 
-            varying float v_layer;
+varying float v_layer;
 
-            void vertex() {
-                v_layer = UV2.x;
-            }
+void vertex() {
+    v_layer = UV2.x;
+}
 
-            void fragment() {
-                vec3 uvw = vec3(UV, v_layer);
-                vec4 tex = texture(u_texture_array, uvw);
+void fragment() {
+    vec3 uvw = vec3(UV, v_layer);
+    vec4 tex = texture(u_texture_array, uvw);
 
-                if (tex.a < 0.1) {
-                    discard;
-                }
+    if (tex.a < 0.1) {
+        discard;
+    }
 
-                ALBEDO = tex.rgb;
-            }
+    ALBEDO = tex.rgb;
+}
         )");
 
         mat->set_shader(shader);
@@ -594,7 +598,7 @@ namespace craftbuild {
             for (const auto& [local_id, global_id] : chunk.value().tag_ids) {
                 ofs.write(reinterpret_cast<const byte*>(&local_id), sizeof(uint8));
                 ofs.write(reinterpret_cast<const byte*>(&global_id.first), sizeof(uint32));
-                ofs.write(reinterpret_cast<const byte*>(&global_id.second), sizeof(uint16));
+                ofs.write(reinterpret_cast<const byte*>(&global_id.second), sizeof(size));
             }
 
             uint32 complex_size = static_cast<uint32>(chunk.value().complex_blocks.size());
@@ -678,10 +682,10 @@ namespace craftbuild {
             ifs.read(reinterpret_cast<byte*>(&tag_ids_size), sizeof(uint8));
             for (auto j : range<uint8>(tag_ids_size)) {
                 uint8 local_id;
-                std::pair<uint32, uint16> global_id;
+                std::pair<uint32, size_t> global_id;
                 ifs.read(reinterpret_cast<byte*>(&local_id), sizeof(uint8));
                 ifs.read(reinterpret_cast<byte*>(&global_id.first), sizeof(uint32));
-                ifs.read(reinterpret_cast<byte*>(&global_id.second), sizeof(uint16));
+                ifs.read(reinterpret_cast<byte*>(&global_id.second), sizeof(size));
                 chunk.value().tag_ids[local_id] = global_id;
             }
 

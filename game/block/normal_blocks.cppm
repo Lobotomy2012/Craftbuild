@@ -9,14 +9,17 @@ import misc.number;
 import game.block;
 
 export namespace craftbuild {
-	class AirBlock : public Block1F {
+	class Air : public Block1F {
 	public:
-		std::vector<std::pair<Str, uint64>> init_tags() override {
-			return { { "transparent", true } };
+		std::vector<std::pair<Str, size>> init_tags() override {
+			return { { "transparent", 1 } };
 		}
 	};
-	class DirtBlock : public Block1F {};
-	class GrassBlock : public Block3F {};
-	class StoneBlock : public Block1F {};
-	class BedrockBlock : public Block1F {};
+	class Dirt : public Block1F {};
+	class Grass : public Block3F {};
+	class Stone : public Block1F {};
+	class OakPlanks : public Block1F {};
+	class DiamondBlock : public Block1F {};
+	class DiamondOre : public Block1F {};
+	class Bedrock : public Block1F {};
 }
