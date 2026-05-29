@@ -87,9 +87,6 @@ namespace craftbuild {
         AtlasTexture::build_texture_array();
         setup_voxel_material();
 
-        if (not get_node_or_null(NodePath("Sun"))) add_child(memnew(Sun));
-        if (not get_node_or_null(NodePath("Sky"))) add_child(memnew(CraftSky));
-
         player_ptr = get_node<Player>("Player");
 
         log<LogType::VERBOSE>("Assets loaded");
@@ -227,14 +224,6 @@ namespace craftbuild {
         }
     }
 
-    none Main::_input(const Ref<InputEvent>& event) {
-        // ESC: Lock/Unlock mouse
-        if (event->is_action_pressed("ui_cancel")) {
-            if (not pausing.load(std::memory_order_relaxed)) emit_signal("pause");
-            else emit_signal("resume");
-        }
-    }
-
     none Main::setup_voxel_material() {
         Ref<ShaderMaterial> mat;
         mat.instantiate();
@@ -320,7 +309,7 @@ void fragment() {
                 }
 
                 std::unique_lock<std::mutex> lock(loop_mutex);
-                loop_cv.wait_for(lock, std::chrono::milliseconds(250));
+                loop_cv.wait_for(lock, std::chrono::milliseconds(sleep_time_cpu));
             }
         });
     }
@@ -773,6 +762,19 @@ void fragment() {
         pausing.store(false, std::memory_order_relaxed);
     }
 
+    none Main::start_chat() {
+        Input* input = Input::get_singleton();
+        input->set_mouse_mode(Input::MOUSE_MODE_VISIBLE);
+        chatting.store(true, std::memory_order_relaxed);
+    }
+
+    none Main::chat(const String msg) {
+        if (msg != "") log<LogType::NORMAL>(format{} << "[Player] " << msg.utf8());
+        Input* input = Input::get_singleton();
+        input->set_mouse_mode(Input::MOUSE_MODE_CAPTURED);
+        chatting.store(false, std::memory_order_relaxed);
+    }
+
     none Main::set_seed_and_world_name(int32 seed, const String name) {
         world_seed.store(seed, std::memory_order_release);
         world_name = name.utf8();
@@ -782,13 +784,19 @@ void fragment() {
         render_distance = rd;
     }
 
+    none Main::set_sleep_time_cpu(int32 stc) {
+        sleep_time_cpu = stc;
+    }
+
     none Main::_bind_methods() {
-        ADD_SIGNAL(MethodInfo("pause"));
-        ADD_SIGNAL(MethodInfo("resume"));
         ClassDB::bind_method(D_METHOD("init"), &Main::_ready);
+        ClassDB::bind_method(D_METHOD("process"), &Main::_process);
         ClassDB::bind_method(D_METHOD("pause_game"), &Main::pause);
         ClassDB::bind_method(D_METHOD("resume_game"), &Main::resume);
+        ClassDB::bind_method(D_METHOD("start_chat"), &Main::start_chat);
+        ClassDB::bind_method(D_METHOD("chat", "msg"), &Main::chat);
         ClassDB::bind_method(D_METHOD("set_seed_and_world_name", "seed", "name"), &Main::set_seed_and_world_name);
         ClassDB::bind_method(D_METHOD("set_render_distance", "rd"), &Main::set_render_distance);
+        ClassDB::bind_method(D_METHOD("set_sleep_time_cpu", "stc"), &Main::set_sleep_time_cpu);
     }
 }

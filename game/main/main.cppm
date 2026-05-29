@@ -72,6 +72,7 @@ export namespace craftbuild {
         std::mutex chunks_to_remove_mutex;
         std::atomic<bool> should_remove_chunks = false;
         std::atomic<bool> pausing = true;
+        std::atomic<bool> chatting = false;
         std::mutex loop_mutex;
         std::condition_variable loop_cv;
 
@@ -79,6 +80,7 @@ export namespace craftbuild {
 
     public:
         inline static int32 render_distance = 32;
+        inline static int32 sleep_time_cpu = 180;
 
         inline static const int32 SIZE_X = render_distance * 16;
         inline static const int32 SIZE_Z = render_distance * 16;
@@ -86,7 +88,6 @@ export namespace craftbuild {
         none _ready() override;
         none _process(float64 delta) override;
         none _notification(int p_what);
-        none _input(const Ref<InputEvent>& event) override;
         
         none setup_voxel_material();
 
@@ -111,12 +112,17 @@ export namespace craftbuild {
 
         none pause();
         none resume();
+        none start_chat();
+
+        none chat(const String msg);
 
         none set_seed_and_world_name(int32 seed, const String name);
         none set_render_distance(int32 rd);
+        none set_sleep_time_cpu(int32 stc);
 
         static none _bind_methods();
 
         friend class Player;
+        friend none craftbuild_mod_main();
     };
 }

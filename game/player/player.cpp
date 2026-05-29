@@ -120,7 +120,15 @@ namespace craftbuild {
 
         Vector3 velocity = get_velocity();
         Input* input = Input::get_singleton();
-        const bool jump_pressed = input->is_key_pressed(KEY_SPACE);
+
+        const bool chatting = world->chatting.load(std::memory_order_relaxed);
+        const bool key_space = chatting ? false : input->is_key_pressed(KEY_SPACE);
+        const bool key_shift = chatting ? false : input->is_key_pressed(KEY_SHIFT);
+        const bool key_ctrl = chatting ? false : input->is_key_pressed(KEY_CTRL);
+        const bool key_w = chatting ? false : input->is_key_pressed(KEY_W);
+        const bool key_d = chatting ? false : input->is_key_pressed(KEY_D);
+        const bool key_s = chatting ? false : input->is_key_pressed(KEY_S);
+        const bool key_a = chatting ? false : input->is_key_pressed(KEY_A);
 
         // Gravity & Jump
         is_grounded = is_on_floor();
@@ -129,10 +137,10 @@ namespace craftbuild {
 
             if (is_grounded) {
                 if (velocity.y < 0.0f) velocity.y = -0.1f;
-                if (jump_pressed) velocity.y = jump_velocity;
+                if (key_space) velocity.y = jump_velocity;
                 can_fly = false;
             }
-            else if (gamemode == Gamemode::CREATIVE and jump_pressed and not jump_was_pressed) {
+            else if (gamemode == Gamemode::CREATIVE and key_space and not jump_was_pressed) {
                 can_fly = not can_fly;
                 velocity.y = 0.0f;
             }
@@ -140,24 +148,24 @@ namespace craftbuild {
         }
         else {
             velocity.y = 0;
-            if (input->is_key_pressed(KEY_SPACE)) velocity.y = speed;
-            if (input->is_key_pressed(KEY_SHIFT)) velocity.y = -speed;
+            if (key_space) velocity.y = speed;
+            if (key_shift) velocity.y = -speed;
             if (is_grounded) can_fly = false;
         }
-        jump_was_pressed = jump_pressed;
+        jump_was_pressed = key_space;
 
         Vector3 forward = -camera->get_global_transform().basis.get_column(2);
         Vector3 right = camera->get_global_transform().basis.get_column(0);
 
-        float32 forward_input = (input->is_key_pressed(KEY_W) ? 1.0f : 0.0f) - (input->is_key_pressed(KEY_S) ? 1.0f : 0.0f);
-        float32 strafe_input =  (input->is_key_pressed(KEY_D) ? 1.0f : 0.0f) - (input->is_key_pressed(KEY_A) ? 1.0f : 0.0f);
+        float32 forward_input = (key_w ? 1.0f : 0.0f) - (key_s ? 1.0f : 0.0f);
+        float32 strafe_input =  (key_d ? 1.0f : 0.0f) - (key_a ? 1.0f : 0.0f);
 
         Vector3 move_dir = (forward * forward_input) + (right * strafe_input);
         move_dir.y = 0;
 
         if (move_dir.length() > 0) move_dir = move_dir.normalized();
 
-        running = input->is_key_pressed(KEY_W) and (input->is_key_pressed(KEY_CTRL) or running);
+        running = key_w and (key_ctrl or running);
         float32 current_speed = running ? speed * 2.0f : speed;
 
         velocity.x = move_dir.x * current_speed;
@@ -170,7 +178,7 @@ namespace craftbuild {
     none Player::_input(const Ref<InputEvent>& event) {
         if (not camera or not world_ptr) return;
         Main* world = static_cast<Main*>(world_ptr);
-        if (world->pausing.load(std::memory_order_relaxed)) return;
+        if (world->pausing.load(std::memory_order_relaxed) or world->chatting.load(std::memory_order_relaxed)) return;
 
         static bool gamemode_toggled = false;
 
