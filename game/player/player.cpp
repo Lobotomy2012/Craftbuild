@@ -129,7 +129,7 @@ namespace craftbuild {
         const bool key_d = chatting ? false : input->is_key_pressed(KEY_D);
         const bool key_s = chatting ? false : input->is_key_pressed(KEY_S);
         const bool key_a = chatting ? false : input->is_key_pressed(KEY_A);
-
+         
         // Gravity & Jump
         is_grounded = is_on_floor();
         if (not can_fly) {

@@ -787,7 +787,7 @@ void fragment() {
     none Main::set_sleep_time_cpu(int32 stc) {
         sleep_time_cpu = stc;
     }
-
+    
     none Main::_bind_methods() {
         ClassDB::bind_method(D_METHOD("init"), &Main::_ready);
         ClassDB::bind_method(D_METHOD("process"), &Main::_process);
