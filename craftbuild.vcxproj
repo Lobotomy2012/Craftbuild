@@ -157,6 +157,7 @@
   <ItemGroup>
     <ClCompile Include="game\core.cppm" />
     <ClCompile Include="game\player\skin_manager.cpp" />
+    <ClCompile Include="misc\list.cppm" />
     <ClCompile Include="misc\pos.cppm" />
     <ClCompile Include="game\environment.cppm" />
     <ClCompile Include="game\texture\atlas_texture.cppm">

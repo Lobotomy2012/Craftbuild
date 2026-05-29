@@ -3,7 +3,6 @@ module;
 #include <limits>
 #include <string>
 #include <vector>
-#include <cstdint>
 #include <iostream>
 #include <utility>
 #include <cstring>
@@ -230,17 +229,15 @@ export namespace craftbuild {
         Str& operator+=(const std::string& s) { encode(to_u32(s)); return *this; }
         Str& operator+=(const Str& s) {
             expect(s.__len__);
-            for (auto i : range<size>(s.__len__)) {
-                append(s.__value__[i]);
-            }
+            memcpy(&__value__[__len__], s.__value__, s.__len__);
+            __len__ += s.__len__;
             return *this;
         }
         Str& operator+=(Str&& s) noexcept {
             if (this == &s) return *this;
             expect(s.__len__);
-            for (auto i : range<size>(s.__len__)) {
-                append(std::move(s.__value__[i]));
-            }
+            memcpy(&__value__[__len__], s.__value__, s.__len__);
+            __len__ += s.__len__;
             s.clear();
             return *this;
         }
@@ -252,7 +249,10 @@ export namespace craftbuild {
             }
             Str original(*this);
             expect(__len__ * (n - 1));
-            for (auto i : range<size>(n)) *this += original;
+            for (auto i : range<size>(n - 1)) {
+                memcpy(&__value__[__len__], original.__value__, original.__len__);
+                __len__ += original.__len__;
+            }
             return *this;
         }
 
@@ -277,10 +277,7 @@ export namespace craftbuild {
             if (not __value__ and not s.__value__) return true;
             else if (not __value__ or not s.__value__) return false;
 
-            for (auto i : range<size>(__len__)) {
-                if (__value__[i] != s.__value__[i]) return false;
-            }
-            return true;
+            return memcmp(__value__, s.__value__, __len__) == 0;
         }
 
         // FULL DECODE -> UTF-8 string

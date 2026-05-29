@@ -140,33 +140,33 @@ namespace craftbuild {
             Ref<ArrayMesh> mesh;
             mesh.instantiate();
 
-            if (data.value().vertices.size() != 0) {
+            if (len(data.value().vertices) != 0) {
                 Array arrays;
                 arrays.resize(Mesh::ARRAY_MAX);
 
                 PackedVector3Array vertices;
-                vertices.resize(data.value().vertices.size());
-                memcpy(vertices.ptrw(), data.value().vertices.data(), data.value().vertices.size() * sizeof(Pos<float32>));
+                vertices.resize(len(data.value().vertices));
+                memcpy(vertices.ptrw(), data.value().vertices.c_ptr(), len(data.value().vertices) * sizeof(Pos<float32>));
 
                 PackedVector3Array normals;
-                normals.resize(data.value().normals.size());
-                memcpy(normals.ptrw(), data.value().normals.data(), data.value().normals.size() * sizeof(Pos<float32>));
+                normals.resize(len(data.value().normals));
+                memcpy(normals.ptrw(), data.value().normals.c_ptr(), len(data.value().normals) * sizeof(Pos<float32>));
 
                 PackedInt32Array indices;
-                indices.resize(data.value().indices.size());
-                memcpy(indices.ptrw(), data.value().indices.data(), data.value().indices.size() * sizeof(int32));
+                indices.resize(len(data.value().indices));
+                memcpy(indices.ptrw(), data.value().indices.c_ptr(), len(data.value().indices) * sizeof(int32));
 
                 PackedVector2Array uvs;
-                uvs.resize(data.value().uvs.size());
-                memcpy(uvs.ptrw(), data.value().uvs.data(), data.value().uvs.size() * sizeof(Vector2));
+                uvs.resize(len(data.value().uvs));
+                memcpy(uvs.ptrw(), data.value().uvs.c_ptr(), len(data.value().uvs) * sizeof(Vector2));
 
                 PackedVector2Array uvs_layer;
-                uvs_layer.resize(data.value().uvs_layer.size());
-                memcpy(uvs_layer.ptrw(), data.value().uvs_layer.data(), data.value().uvs_layer.size() * sizeof(Vector2));
+                uvs_layer.resize(len(data.value().uvs_layer));
+                memcpy(uvs_layer.ptrw(), data.value().uvs_layer.c_ptr(), len(data.value().uvs_layer) * sizeof(Vector2));
 
                 PackedVector3Array collision_faces;
-                collision_faces.resize(data.value().collision_faces.size());
-                memcpy(collision_faces.ptrw(), data.value().collision_faces.data(), data.value().collision_faces.size() * sizeof(Pos<float32>));
+                collision_faces.resize(len(data.value().collision_faces));
+                memcpy(collision_faces.ptrw(), data.value().collision_faces.c_ptr(), len(data.value().collision_faces) * sizeof(Pos<float32>));
 
                 arrays[Mesh::ARRAY_VERTEX] = vertices;
                 arrays[Mesh::ARRAY_NORMAL] = normals;
@@ -183,13 +183,13 @@ namespace craftbuild {
             updates_this_frame++;
         }
 
-        std::vector<Pos<int>> pending_unloads;
+        List<Pos<int>> pending_unloads;
 
         if (not should_remove_chunks.load(std::memory_order_acquire)) return;
 
         {
             std::lock_guard lock(chunks_to_remove_mutex);
-            if (chunks_to_remove.empty()) {
+            if (not chunks_to_remove) {
                 should_remove_chunks.store(false, std::memory_order_release);
                 return;
             }
@@ -297,6 +297,7 @@ void fragment() {
     none Main::start_scheduler_thread() {
         scheduler_thread = std::thread([this]() {
             ThreadRegistry::register_thread("Scheduler Thread");
+            log<LogType::INFO>("Scheduler thread started");
 
             auto last_unload_time = std::chrono::high_resolution_clock::now();
             while (running.load(std::memory_order_relaxed)) {
@@ -459,7 +460,7 @@ void fragment() {
 
     none Main::unload_distant_chunks(int p_cx, int p_cz) {
         const int unload_dist = render_distance + 4;
-        std::vector<Pos<int>> chunks_to_remove;
+        List<Pos<int>> chunks_to_remove;
 
         {
             std::shared_lock lock(chunks_mutex);
@@ -467,18 +468,18 @@ void fragment() {
                 int dx = std::abs(E.first.x - p_cx);
                 int dz = std::abs(E.first.z - p_cz);
                 if (dx > unload_dist or dz > unload_dist) {
-                    chunks_to_remove.push_back(E.first);
+                    chunks_to_remove.append(E.first);
                 }
             }
         }
 
         {
             std::lock_guard lock(chunks_to_remove_mutex);
-            this->chunks_to_remove.insert(this->chunks_to_remove.end(), chunks_to_remove.begin(), chunks_to_remove.end());
+            this->chunks_to_remove += chunks_to_remove;
         }
         should_remove_chunks.store(true, std::memory_order_release);
 
-        if (not chunks_to_remove.empty()) log<LogType::VERBOSE>(format{} << "Queued unload for " << chunks_to_remove.size() << " chunks.");
+        if (chunks_to_remove) log<LogType::VERBOSE>(format{} << "Queued unload for " << len(chunks_to_remove) << " chunks.");
     }
 
     Ptr<Chunk> Main::get_chunk(int cx, int cz) {

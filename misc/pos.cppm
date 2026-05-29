@@ -50,18 +50,11 @@ export namespace craftbuild {
 
 #undef def_operator
 
-        operator Vector3() {
-            return Vector3(static_cast<float32>(x), static_cast<float32>(y), static_cast<float32>(z));
+        operator godot::Vector3() const {
+            return godot::Vector3(static_cast<float32>(x), static_cast<float32>(y), static_cast<float32>(z));
         }
-        operator Vector3i() {
-            return Vector3i(static_cast<int>(x), static_cast<int>(y), static_cast<int>(z));
-        }
-
-        operator const Vector3() const {
-            return Vector3(static_cast<const float32>(x), static_cast<const float32>(y), static_cast<const float32>(z));
-        }
-        operator const Vector3i() const {
-            return Vector3i(static_cast<const int>(x), static_cast<const int>(y), static_cast<const int>(z));
+        operator godot::Vector3i() const {
+            return godot::Vector3i(static_cast<int>(x), static_cast<int>(y), static_cast<int>(z));
         }
 
         bool operator==(const Pos& other) const {

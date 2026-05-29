@@ -23,6 +23,7 @@ export module game.main;
 import misc.ptr;
 import misc.str;
 import misc.dict;
+import misc.list;
 import misc.range;
 import misc.number;
 import misc.format;
@@ -68,7 +69,7 @@ export namespace craftbuild {
         std::unordered_set<Pos<int>, Hasher<Pos<int>>> pending_mesh_jobs;
         std::mutex pending_jobs_mutex;
 
-		std::vector<Pos<int>> chunks_to_remove;
+		List<Pos<int>> chunks_to_remove;
         std::mutex chunks_to_remove_mutex;
         std::atomic<bool> should_remove_chunks = false;
         std::atomic<bool> pausing = true;

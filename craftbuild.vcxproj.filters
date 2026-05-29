@@ -98,5 +98,8 @@
     <ClCompile Include="misc\range.cppm">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="misc\list.cppm">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

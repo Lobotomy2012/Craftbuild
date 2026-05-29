@@ -12,6 +12,7 @@ export module game.block;
 import misc.ptr;
 import misc.str;
 import misc.dict;
+import misc.list;
 import misc.number;
 import misc.pos;
 import game.core;
@@ -33,7 +34,7 @@ export namespace craftbuild {
 
     struct TagEntry {
         Str name;
-        std::vector<uint64> value;
+        List<uint64> value;
 
         TagEntry() = default;
         TagEntry(const Str& n) : name(n) {}
@@ -53,18 +54,18 @@ export namespace craftbuild {
         static size add_value(uint32 tag_id, uint64 value) {
             if (tag_id >= tag.size()) return 0;
             auto& values = tag[tag_id].value;
-            values.push_back(value);
-            return values.size() - 1;
+            values.append(value);
+            return len(values) - 1;
         }
 
         static none set_value(uint32 tag_id, size index, uint64 value) {
 			if (tag_id >= tag.size()) return;
             auto& values = tag[tag_id].value;
-            if (index >= values.size()) add_value(tag_id, value);
+            if (index >= len(values)) add_value(tag_id, value);
             else values[index] = value;
         }
 
-        static std::vector<uint64>& get_value(uint32 tag_id) {
+        static List<uint64>& get_value(uint32 tag_id) {
             return tag[tag_id].value;
         }
 
@@ -92,43 +93,43 @@ export namespace craftbuild {
 
 		virtual std::vector<std::pair<Str, size>> init_tags() { return {}; }
 
-        static none create_face(Face face, const Vector3& pos, std::vector<Pos<real>>& vertices) {
+        static none create_face(Face face, const Vector3& pos, List<Pos<real>>& vertices) {
             switch (face) {
             case Face::TOP: // +Y
-                vertices.push_back(pos + Vector3(1, 1, 0));
-                vertices.push_back(pos + Vector3(0, 1, 0));
-                vertices.push_back(pos + Vector3(0, 1, 1));
-                vertices.push_back(pos + Vector3(1, 1, 1));
+                vertices.append(pos + Vector3(1, 1, 0));
+                vertices.append(pos + Vector3(0, 1, 0));
+                vertices.append(pos + Vector3(0, 1, 1));
+                vertices.append(pos + Vector3(1, 1, 1));
                 break;
             case Face::BOTTOM: // -Y
-                vertices.push_back(pos + Vector3(1, 0, 1));
-                vertices.push_back(pos + Vector3(0, 0, 1));
-                vertices.push_back(pos + Vector3(0, 0, 0));
-                vertices.push_back(pos + Vector3(1, 0, 0));
+                vertices.append(pos + Vector3(1, 0, 1));
+                vertices.append(pos + Vector3(0, 0, 1));
+                vertices.append(pos + Vector3(0, 0, 0));
+                vertices.append(pos + Vector3(1, 0, 0));
                 break;
             case Face::RIGHT: // +X
-                vertices.push_back(pos + Vector3(1, 1, 0));
-                vertices.push_back(pos + Vector3(1, 1, 1));
-                vertices.push_back(pos + Vector3(1, 0, 1));
-                vertices.push_back(pos + Vector3(1, 0, 0));
+                vertices.append(pos + Vector3(1, 1, 0));
+                vertices.append(pos + Vector3(1, 1, 1));
+                vertices.append(pos + Vector3(1, 0, 1));
+                vertices.append(pos + Vector3(1, 0, 0));
                 break;
             case Face::LEFT: // -X
-                vertices.push_back(pos + Vector3(0, 1, 1));
-                vertices.push_back(pos + Vector3(0, 1, 0));
-                vertices.push_back(pos + Vector3(0, 0, 0));
-                vertices.push_back(pos + Vector3(0, 0, 1));
+                vertices.append(pos + Vector3(0, 1, 1));
+                vertices.append(pos + Vector3(0, 1, 0));
+                vertices.append(pos + Vector3(0, 0, 0));
+                vertices.append(pos + Vector3(0, 0, 1));
                 break;
             case Face::FRONT: // +Z
-                vertices.push_back(pos + Vector3(1, 1, 1));
-                vertices.push_back(pos + Vector3(0, 1, 1));
-                vertices.push_back(pos + Vector3(0, 0, 1));
-                vertices.push_back(pos + Vector3(1, 0, 1));
+                vertices.append(pos + Vector3(1, 1, 1));
+                vertices.append(pos + Vector3(0, 1, 1));
+                vertices.append(pos + Vector3(0, 0, 1));
+                vertices.append(pos + Vector3(1, 0, 1));
                 break;
             case Face::BACK: // -Z
-                vertices.push_back(pos + Vector3(0, 1, 0));
-                vertices.push_back(pos + Vector3(1, 1, 0));
-                vertices.push_back(pos + Vector3(1, 0, 0));
-                vertices.push_back(pos + Vector3(0, 0, 0));
+                vertices.append(pos + Vector3(0, 1, 0));
+                vertices.append(pos + Vector3(1, 1, 0));
+                vertices.append(pos + Vector3(1, 0, 0));
+                vertices.append(pos + Vector3(0, 0, 0));
                 break;
             }
         }

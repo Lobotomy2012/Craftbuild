@@ -17,6 +17,7 @@ export module game.world.chunk;
 import misc.ptr;
 import misc.str;
 import misc.dict;
+import misc.list;
 import misc.range;
 import misc.number;
 import misc.pos;
@@ -29,12 +30,12 @@ using namespace godot;
 
 export namespace craftbuild {
     struct MeshData {
-        std::vector<Pos<real>> vertices;
-        std::vector<Pos<real>> normals;
-        std::vector<int32> indices;
-        std::vector<Vector2> uvs;
-        std::vector<Vector2> uvs_layer;
-        std::vector<Pos<real>> collision_faces;
+        List<Pos<real>> vertices;
+        List<Pos<real>> normals;
+        List<int32> indices;
+        List<Vector2> uvs;
+        List<Vector2> uvs_layer;
+        List<Pos<real>> collision_faces;
     };
 
     struct FaceMask {
@@ -345,22 +346,22 @@ export namespace craftbuild {
 
         none generate_mesh(Ptr<Chunk> neighbors[4]) {
             Ptr<MeshData> data = new MeshData();
-            auto& vertices = data.value().vertices;
-            auto& normals = data.value().normals;
-            auto& indices = data.value().indices;
-            auto& uvs = data.value().uvs;
-            auto& uvs_layer = data.value().uvs_layer;
+            auto& vertices        = data.value().vertices;
+            auto& normals         = data.value().normals;
+            auto& indices         = data.value().indices;
+            auto& uvs             = data.value().uvs;
+            auto& uvs_layer       = data.value().uvs_layer;
             auto& collision_faces = data.value().collision_faces;
 
             const uint32 AIR = BlockRegistry::get_id("Air");
             const uint32 TRANSPARENT = TagRegistry::get_id("transparent");
 
-            vertices.reserve(4096);
-            normals.reserve(4096);
-            uvs.reserve(4096);
-            uvs_layer.reserve(4096);
-            indices.reserve(6144);
-            collision_faces.reserve(6144);
+            vertices.expect(4096);
+            normals.expect(4096);
+            uvs.expect(4096);
+            uvs_layer.expect(4096);
+            indices.expect(6144);
+            collision_faces.expect(6144);
 
             std::vector<std::shared_mutex*> mutexes_to_lock;
             mutexes_to_lock.push_back(&data_mutex);
@@ -419,6 +420,9 @@ export namespace craftbuild {
             const Face front_faces[3] = { Face::RIGHT, Face::TOP,    Face::FRONT };
             const Face back_faces[3] =  { Face::LEFT,  Face::BOTTOM, Face::BACK  };
 
+            List<FaceMask> mask;
+            mask.resize(Chunk::SIZE_Y * std::max(Chunk::SIZE_X, Chunk::SIZE_Z));
+
             uint64 vertex_offset = 0;
             for (auto d : range<int>(3)) {
                 const int u = (d + 1) % 3;
@@ -429,8 +433,6 @@ export namespace craftbuild {
                 q[d] = 1;
 
                 for (x[d] = -1; x[d] < dims[d]; ++x[d]) {
-                    std::vector<FaceMask> mask(dims[u] * dims[v]);
-
                     for (x[v] = 0; x[v] < dims[v]; ++x[v]) {
                         for (x[u] = 0; x[u] < dims[u]; ++x[u]) {
                             const bool a_inside = (x[d] >= 0);
@@ -499,22 +501,22 @@ export namespace craftbuild {
                             };
 
                             if (not current_face.back_face) {
-                                vertices.push_back(p0); vertices.push_back(p1);
-                                vertices.push_back(p2); vertices.push_back(p3);
+                                vertices.append(p0); vertices.append(p1);
+                                vertices.append(p2); vertices.append(p3);
 
-                                uvs.push_back(get_uv(p0));
-                                uvs.push_back(get_uv(p1));
-                                uvs.push_back(get_uv(p2));
-                                uvs.push_back(get_uv(p3));
+                                uvs.append(get_uv(p0));
+                                uvs.append(get_uv(p1));
+                                uvs.append(get_uv(p2));
+                                uvs.append(get_uv(p3));
                             }
                             else {
-                                vertices.push_back(p0); vertices.push_back(p3);
-                                vertices.push_back(p2); vertices.push_back(p1);
+                                vertices.append(p0); vertices.append(p3);
+                                vertices.append(p2); vertices.append(p1);
 
-                                uvs.push_back(get_uv(p0));
-                                uvs.push_back(get_uv(p3));
-                                uvs.push_back(get_uv(p2));
-                                uvs.push_back(get_uv(p1));
+                                uvs.append(get_uv(p0));
+                                uvs.append(get_uv(p3));
+                                uvs.append(get_uv(p2));
+                                uvs.append(get_uv(p1));
                             }
 
                             Vector3 normal(0, 0, 0);
@@ -522,20 +524,20 @@ export namespace craftbuild {
                             else if (d == 1) normal.y = current_face.back_face ? -1.0f : 1.0f;
                             else if (d == 2) normal.z = current_face.back_face ? -1.0f : 1.0f;
 
-                            for (auto n : range<int>(4)) normals.push_back(normal);
+                            for (auto n : range<int>(4)) normals.append(normal);
 
                             Vector2 layer_uv(static_cast<float>(current_face.layer), 0.0f);
-                            for (auto n : range<int>(4)) uvs_layer.push_back(layer_uv);
+                            for (auto n : range<int>(4)) uvs_layer.append(layer_uv);
 
-                            indices.push_back(vertex_offset + 0); indices.push_back(vertex_offset + 2); indices.push_back(vertex_offset + 1);
-                            indices.push_back(vertex_offset + 0); indices.push_back(vertex_offset + 3); indices.push_back(vertex_offset + 2);
+                            indices.append(vertex_offset + 0); indices.append(vertex_offset + 2); indices.append(vertex_offset + 1);
+                            indices.append(vertex_offset + 0); indices.append(vertex_offset + 3); indices.append(vertex_offset + 2);
 
-                            collision_faces.push_back(vertices[vertex_offset + 0]);
-                            collision_faces.push_back(vertices[vertex_offset + 2]);
-                            collision_faces.push_back(vertices[vertex_offset + 1]);
-                            collision_faces.push_back(vertices[vertex_offset + 0]);
-                            collision_faces.push_back(vertices[vertex_offset + 3]);
-                            collision_faces.push_back(vertices[vertex_offset + 2]);
+                            collision_faces.append(vertices[vertex_offset + 0]);
+                            collision_faces.append(vertices[vertex_offset + 2]);
+                            collision_faces.append(vertices[vertex_offset + 1]);
+                            collision_faces.append(vertices[vertex_offset + 0]);
+                            collision_faces.append(vertices[vertex_offset + 3]);
+                            collision_faces.append(vertices[vertex_offset + 2]);
 
                             vertex_offset += 4;
 
