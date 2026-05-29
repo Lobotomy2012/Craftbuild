@@ -101,5 +101,11 @@
     <ClCompile Include="misc\list.cppm">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="game\command\command.cppm">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="game\command\command.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

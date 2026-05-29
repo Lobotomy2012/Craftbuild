@@ -13,6 +13,8 @@ export module game.player;
 
 import misc.pos;
 import misc.ptr;
+import misc.str;
+import misc.dict;
 import misc.range;
 import misc.number;
 import misc.format;
@@ -58,6 +60,7 @@ export namespace craftbuild {
         int8 hp = 20;
         Dictionary hit;
         MeshInstance3D* selection_box;
+        Dict<Str, int> inventory;
 
     protected:
         static none _bind_methods();

@@ -155,6 +155,8 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="game\command\command.cpp" />
+    <ClCompile Include="game\command\command.cppm" />
     <ClCompile Include="game\core.cppm" />
     <ClCompile Include="game\player\skin_manager.cpp" />
     <ClCompile Include="misc\list.cppm" />

@@ -266,18 +266,14 @@ export namespace craftbuild {
         Str operator*(size n) const { Str cache(*this); return cache *= n; }
 
         uint8& operator[](size pos) { return __value__[pos]; }
+        const uint8& operator[](size pos) const { return __value__[pos]; }
 
         operator bool() const {
             return *this != U"";
         }
 
         bool operator==(const Str& s) const {
-            if (__len__ != s.__len__) return false;
-
-            if (not __value__ and not s.__value__) return true;
-            else if (not __value__ or not s.__value__) return false;
-
-            return memcmp(__value__, s.__value__, __len__) == 0;
+            return __len__ == s.__len__ and memcmp(__value__, s.__value__, __len__) == 0;
         }
 
         // FULL DECODE -> UTF-8 string

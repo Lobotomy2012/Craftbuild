@@ -213,6 +213,10 @@ export namespace craftbuild {
             if (name2id.find(block_name) == name2id.end()) return 0;
             return name2id[block_name];
         }
+
+        static bool has_block(const Str& block_name) {
+            return name2id.contains(block_name);
+        }
     };
 
     struct BlockStorage {

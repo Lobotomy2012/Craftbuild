@@ -89,7 +89,7 @@ export namespace craftbuild {
         const Str current_log = format{} << info << message;
         Str log;
 
-        if (colored_log) log += format{} << "\033[97m" << info << " \033[37m" << message << "\033[0m";
+        if (colored_log) log += format{} << "\033[97m" << info << "\033[37m" << message << "\033[0m";
         else log = current_log;
 
         LogQueue::store(log, current_log);

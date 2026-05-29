@@ -54,6 +54,7 @@ export namespace craftbuild {
         Str world_name = "My World";
 
         none* player_ptr = nullptr;
+        none* command_ptr = nullptr;
 
         std::atomic<bool> running = true;
         std::atomic<bool> world_ready = false;
@@ -83,8 +84,8 @@ export namespace craftbuild {
         inline static int32 render_distance = 32;
         inline static int32 sleep_time_cpu = 180;
 
-        inline static const int32 SIZE_X = render_distance * 16;
-        inline static const int32 SIZE_Z = render_distance * 16;
+        inline static int32 SIZE_X = render_distance * 16;
+        inline static int32 SIZE_Z = render_distance * 16;
 
         none _ready() override;
         none _process(float64 delta) override;
@@ -124,6 +125,7 @@ export namespace craftbuild {
         static none _bind_methods();
 
         friend class Player;
+        friend class CommandInterpreter;
         friend none craftbuild_mod_main();
     };
 }

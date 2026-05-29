@@ -28,6 +28,7 @@ module;
 module game.main;
 
 import game.player;
+import game.command;
 
 namespace craftbuild {
     none Main::_ready() {
@@ -90,6 +91,8 @@ namespace craftbuild {
         player_ptr = get_node<Player>("Player");
 
         log<LogType::VERBOSE>("Assets loaded");
+
+        command_ptr = new CommandInterpreter(this);
 
         world_ready.store(true, std::memory_order_release);
         start_redstone_thread();
@@ -210,7 +213,6 @@ namespace craftbuild {
     none Main::_notification(int p_what) {
         Str file_name = format{} << "user://game/saves/" << world_name << "/overworld.cbsave";
         if (p_what == NOTIFICATION_WM_CLOSE_REQUEST) save_world(file_name); // Auto save
-        else if (p_what == NOTIFICATION_APPLICATION_FOCUS_OUT) emit_signal("pause");
         else if (p_what == NOTIFICATION_EXIT_TREE) {
 			running.store(false, std::memory_order_relaxed);
 
@@ -770,7 +772,15 @@ void fragment() {
     }
 
     none Main::chat(const String msg) {
-        if (msg != "") log<LogType::NORMAL>(format{} << "[Player] " << msg.utf8());
+        if (not msg.is_empty()) {
+            std::string _msg = (std::string)msg.utf8();
+            log<LogType::NORMAL>(format{} << "[Player] " << _msg);
+            if (msg.begins_with("/")) {
+                CommandInterpreter* interpreter = static_cast<CommandInterpreter*>(command_ptr);
+                emit_signal("chat_output", interpreter->execute_command(_msg.erase(0, 1)).std_str().c_str());
+            }
+            else emit_signal("chat_output", msg);
+        }
         Input* input = Input::get_singleton();
         input->set_mouse_mode(Input::MOUSE_MODE_CAPTURED);
         chatting.store(false, std::memory_order_relaxed);
@@ -783,6 +793,8 @@ void fragment() {
 
     none Main::set_render_distance(int32 rd) {
         render_distance = rd;
+        SIZE_X = render_distance * 16;
+        SIZE_Z = render_distance * 16;
     }
 
     none Main::set_sleep_time_cpu(int32 stc) {
@@ -790,6 +802,7 @@ void fragment() {
     }
     
     none Main::_bind_methods() {
+        ADD_SIGNAL(MethodInfo("chat_output", PropertyInfo(Variant::STRING, "line")));
         ClassDB::bind_method(D_METHOD("init"), &Main::_ready);
         ClassDB::bind_method(D_METHOD("process"), &Main::_process);
         ClassDB::bind_method(D_METHOD("pause_game"), &Main::pause);
