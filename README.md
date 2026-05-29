@@ -20,6 +20,7 @@ Indev
 - Setting screen
 - Multi-threading
 - Greedy meshing, texture LOD
+- Chat
 
 # Coming soon
 - Hotbar
