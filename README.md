@@ -1,6 +1,6 @@
 <img width="1717" height="916" alt="logo" src="https://github.com/user-attachments/assets/0b83a353-046e-427b-b10b-e7ff6a83c5cb" />
 <p align=center>
-Created by nam-ann using C++23 and Godot 4.1 :game_die:
+Created by nam-ann using C++23 and Godot 4.7 :game_die:
 </p>
 
 # Craftbuild
@@ -20,6 +20,7 @@ Indev
 - Setting screen
 - Multi-threading
 - Greedy meshing, texture LOD
+- Chat
 
 # Coming soon
 - Hotbar
