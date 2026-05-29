@@ -117,7 +117,7 @@ grow_horizontal = 2
 grow_vertical = 0
 
 [node name="Sun" type="Sun" parent="." unique_id=954182571]
-transform = Transform3D(0.73168886, 0.4686578, -0.49496582, 0, 0.72614086, 0.6875458, 0.6816388, -0.5030695, 0.53130925, 0, 0, 0)
+transform = Transform3D(0.73168886, 0.48817942, -0.47572276, 0, 0.69791025, 0.71618503, 0.6816388, -0.52402455, 0.5106532, 0, 0, 0)
 light_color = Color(1, 0.93, 0.78, 1)
 light_energy = 1.2
 light_indirect_energy = 0.55
@@ -142,11 +142,24 @@ grow_vertical = 2
 texture = ExtResource("6_p57ef")
 
 [node name="ChatBox" type="TextEdit" parent="." unique_id=44354687]
-visible = false
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_top = -30.0
-offset_right = 507.0
+offset_left = 2.0
+offset_top = -32.0
+offset_right = 509.0
+offset_bottom = -2.0
 grow_vertical = 0
 theme_override_font_sizes/font_size = 20
+
+[node name="Output" type="Label" parent="." unique_id=1998115197]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = -247.0
+offset_right = 509.0
+offset_bottom = -32.0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 20
+vertical_alignment = 2
